@@ -16,9 +16,11 @@ Decision log from the design interview. Each entry is final unless revisited her
 12. **Versioning:** the workflow is one lockstep semver version. Standalone installable items carry their own `version` in frontmatter.
 13. **Personalization:** the repo holds an opinionated public SDLC point of view. The author's private `~/.claude` setup stays out of the repo. Patterns are extracted, not files copied. A pre-publish denylist scan guards against leaked paths or names.
 14. **Launch:** private until stable. Then LinkedIn, followed by Show HN, Reddit, and X, with a demo clip.
+15. **CI/CD:** sdlckit's own CI runs its own gate runner (`packages/gate-runner`), and PRs can't merge without it. The same runner ships to users through the CI/CD pack. CI is one reusable workflow (`workflow_call`) plus one composite setup action. The logic lives in TypeScript, not in YAML. Scanner versions are pinned in one file.
+16. **Marketplace layout:** six plugins, one per pack: `sdlckit-workflow`, `sdlckit-cost`, `sdlckit-backend`, `sdlckit-frontend`, `sdlckit-cicd`, `sdlckit-infra`. `content/<pack>/` is the source. A TypeScript build generates `plugins/` and `.claude-plugin/marketplace.json`. Generated output is committed, and CI fails if it drifts from a fresh build. Cross-pack dependencies are declared in each plugin manifest.
+17. **Hook runtime:** each hook is bundled by tsup into one self-contained `.js` file, with no install step for users. Hooks run on Node 22, which the CLI checks at install time. Hooks are fail-open: a crash, timeout, or parse error is logged to a file and the session continues. The only blocking behavior is a user-enabled budget cap at a stage boundary. Every hook has a short hard timeout. Stdout is reserved for the protocol response, and logs go to a file.
+18. **Verification of upstream formats:** the plugin manifest schema is checked against the official Claude Code docs before the generator is written, because that format is the most likely to change.
 
 ## Open topics
 
-- CI/CD specifics (gate runner in GitHub Actions, composite actions)
-- Marketplace manifest layout
-- Hook runtime details
+None. The design interview is complete. Remaining work is implementation, starting with the validators.
