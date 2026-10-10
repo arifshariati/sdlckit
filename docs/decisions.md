@@ -24,6 +24,8 @@ Decision log from the design interview. Each entry is final unless revisited her
 20. **Generator mapping:** skills and rulebooks compile to `skills/<name>/SKILL.md`, because Claude Code requires that folder shape. Agents and commands compile to flat `.md` files. Generated frontmatter keeps only `name` and `description`, and the lifecycle fields stay in the source. Hooks are not generated yet, and the generator refuses them rather than skipping them silently.
 21. **Verification before publish:** the generator's output must pass `claude plugin validate` for the marketplace and for each plugin. This was verified on a sample pack. Install-time checks are not part of CI, because installing writes to a user's settings.
 
+22. **Gates and CI (implements 15):** `packages/gate-runner` runs every gate in order and reports the real output of each failure. It never stops at the first failure. Gates: lint, typecheck, build, test, content validation, the generated-output drift check, and `claude plugin validate` for the marketplace and each plugin. `.github/workflows/gates.yml` is a reusable workflow, and `.github/actions/setup` is the composite setup action. It pins Node from `.nvmrc`, pnpm from `packageManager`, and the Claude Code CLI to one version (2.1.296). Infrastructure scanners (decision 10) join the gates when infrastructure content lands.
+
 ## Open topics
 
 None. The design interview is complete. Remaining work is implementation, starting with the validators.

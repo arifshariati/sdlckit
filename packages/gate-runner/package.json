@@ -1,0 +1,26 @@
+{
+  "name": "@sdlckit/gate-runner",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Runs sdlckit's quality gates and reports real output. Used by sdlckit's own CI and shipped to users.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "sdlckit-gates": "./dist/cli.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsup": "^8.5.1",
+    "vitest": "^5.0.3"
+  }
+}

@@ -15,7 +15,8 @@
     "format": "biome check --write .",
     "content:validate": "node packages/validators/dist/cli.js .",
     "content:generate": "node packages/generator/dist/cli.js .",
-    "content:check": "node packages/generator/dist/cli.js --check ."
+    "content:check": "node packages/generator/dist/cli.js --check .",
+    "gates": "node packages/gate-runner/dist/cli.js ."
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",

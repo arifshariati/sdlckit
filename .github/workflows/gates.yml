@@ -1,0 +1,31 @@
+name: Gates
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gates-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gates:
+    name: Run quality gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up sdlckit
+        uses: ./.github/actions/setup
+
+      - name: Run gates
+        shell: bash
+        env:
+          SDLCKIT_CLAUDE_BIN: claude
+        run: pnpm gates

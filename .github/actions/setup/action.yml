@@ -1,0 +1,28 @@
+name: sdlckit setup
+description: Installs Node 22, pnpm, the locked workspace dependencies, and the pinned Claude Code CLI.
+
+inputs:
+  claude-code-version:
+    description: Pinned Claude Code CLI version. Bump deliberately, in a reviewed PR.
+    required: false
+    default: "2.1.296"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up pnpm
+      uses: pnpm/action-setup@v4
+
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: .nvmrc
+        cache: pnpm
+
+    - name: Install workspace dependencies
+      shell: bash
+      run: pnpm install --frozen-lockfile
+
+    - name: Install pinned Claude Code CLI
+      shell: bash
+      run: npm install -g "@anthropic-ai/claude-code@${{ inputs.claude-code-version }}"
