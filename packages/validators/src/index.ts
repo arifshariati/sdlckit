@@ -1,3 +1,4 @@
+export { type ParsedItem, parseItem } from "./frontmatter.js";
 export { parseDenylist, type ScanHit, scanText } from "./scan.js";
 export {
   CATEGORIES,

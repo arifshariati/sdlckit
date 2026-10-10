@@ -28,7 +28,9 @@ describe("validateContent", () => {
 
   beforeEach(async () => {
     root = await mkdtemp(join(tmpdir(), "sdlckit-validate-"));
-    await mkdir(join(root, "content", "skills"), { recursive: true });
+    await mkdir(join(root, "content", "workflow", "skills"), {
+      recursive: true,
+    });
   });
 
   afterEach(async () => {
@@ -46,7 +48,7 @@ describe("validateContent", () => {
   }
 
   it("passes a valid, current item with no findings", async () => {
-    await write("content/skills/plan-first.md", item());
+    await write("content/workflow/skills/plan-first.md", item());
     expect(await run()).toEqual([]);
   });
 
@@ -56,7 +58,10 @@ describe("validateContent", () => {
   });
 
   it("rejects a name that is not kebab-case", async () => {
-    await write("content/skills/plan-first.md", item({ name: "Plan_First" }));
+    await write(
+      "content/workflow/skills/plan-first.md",
+      item({ name: "Plan_First" }),
+    );
     const findings = await run();
     expect(
       findings.some(
@@ -66,24 +71,36 @@ describe("validateContent", () => {
   });
 
   it("rejects a frontmatter name that differs from the filename", async () => {
-    await write("content/skills/plan-first.md", item({ name: "other-name" }));
+    await write(
+      "content/workflow/skills/plan-first.md",
+      item({ name: "other-name" }),
+    );
     const findings = await run();
     expect(findings.some((f) => f.rule === "name")).toBe(true);
   });
 
   it("rejects a non-semver version", async () => {
-    await write("content/skills/plan-first.md", item({ version: "v1" }));
+    await write(
+      "content/workflow/skills/plan-first.md",
+      item({ version: "v1" }),
+    );
     const findings = await run();
     expect(findings.some((f) => f.message.includes("semver"))).toBe(true);
   });
 
   it("rejects an unknown category", async () => {
-    await write("content/skills/plan-first.md", item({ category: "misc" }));
+    await write(
+      "content/workflow/skills/plan-first.md",
+      item({ category: "misc" }),
+    );
     expect((await run()).some((f) => f.rule === "frontmatter")).toBe(true);
   });
 
   it("requires a replacement when status is superseded", async () => {
-    await write("content/skills/plan-first.md", item({ status: "superseded" }));
+    await write(
+      "content/workflow/skills/plan-first.md",
+      item({ status: "superseded" }),
+    );
     const findings = await run();
     expect(
       findings.some((f) => f.message.includes("must name their replacement")),
@@ -92,7 +109,7 @@ describe("validateContent", () => {
 
   it("accepts a superseded item that names its replacement", async () => {
     await write(
-      "content/skills/plan-first.md",
+      "content/workflow/skills/plan-first.md",
       item({ status: "superseded", replacedBy: "native-plan-mode" }),
     );
     expect(await run()).toEqual([]);
@@ -100,7 +117,7 @@ describe("validateContent", () => {
 
   it("rejects a verified date that is not a real date", async () => {
     await write(
-      "content/skills/plan-first.md",
+      "content/workflow/skills/plan-first.md",
       item({ verified: "2026-02-30" }),
     );
     expect((await run()).some((f) => f.message.includes("real date"))).toBe(
@@ -110,7 +127,7 @@ describe("validateContent", () => {
 
   it("warns, but does not error, when a current item is older than 90 days", async () => {
     await write(
-      "content/skills/plan-first.md",
+      "content/workflow/skills/plan-first.md",
       item({ verified: "2026-01-01" }),
     );
     const findings = await run();
@@ -121,7 +138,7 @@ describe("validateContent", () => {
 
   it("does not flag staleness for superseded items", async () => {
     await write(
-      "content/skills/plan-first.md",
+      "content/workflow/skills/plan-first.md",
       item({
         verified: "2026-01-01",
         status: "superseded",
@@ -136,15 +153,37 @@ describe("validateContent", () => {
     expect((await run()).some((f) => f.rule === "location")).toBe(true);
   });
 
+  it("rejects an item whose type folder is unknown", async () => {
+    await write("content/workflow/misc/plan-first.md", item());
+    expect((await run()).some((f) => f.rule === "location")).toBe(true);
+  });
+
+  it("rejects a category that does not match its pack folder", async () => {
+    await write(
+      "content/cost/skills/plan-first.md",
+      item({ category: "workflow" }),
+    );
+    const findings = await run();
+    expect(findings.some((f) => f.rule === "category")).toBe(true);
+  });
+
+  it("accepts an item whose category matches its pack folder", async () => {
+    await write(
+      "content/cost/skills/plan-first.md",
+      item({ category: "cost" }),
+    );
+    expect(await run()).toEqual([]);
+  });
+
   it("rejects duplicate names across folders", async () => {
-    await write("content/skills/plan-first.md", item());
-    await write("content/agents/plan-first.md", item());
+    await write("content/workflow/skills/plan-first.md", item());
+    await write("content/workflow/agents/plan-first.md", item());
     expect((await run()).some((f) => f.rule === "unique-name")).toBe(true);
   });
 
   it("flags a machine-specific path in the body", async () => {
     await write(
-      "content/skills/plan-first.md",
+      "content/workflow/skills/plan-first.md",
       `${item()}\nSee /Users/someone/project.\n`,
     );
     const findings = await run();
@@ -157,7 +196,7 @@ describe("validateContent", () => {
 
   it("flags a secret-shaped value", async () => {
     await write(
-      "content/skills/plan-first.md",
+      "content/workflow/skills/plan-first.md",
       `${item()}\nKey sk-ant-abcdefghijklmnopqrstuvwx\n`,
     );
     expect((await run()).some((f) => f.rule === "scan:secret")).toBe(true);
@@ -165,7 +204,7 @@ describe("validateContent", () => {
 
   it("flags a denylisted personal term, case-insensitively", async () => {
     await write(
-      "content/skills/plan-first.md",
+      "content/workflow/skills/plan-first.md",
       `${item()}\nWritten for ProjectZebra.\n`,
     );
     const findings = await run(["projectzebra"]);

@@ -1,20 +1,8 @@
 import { readdir, readFile } from "node:fs/promises";
 import { basename, extname, join, relative, sep } from "node:path";
-import matter from "gray-matter";
-import { dump, JSON_SCHEMA, load } from "js-yaml";
+import { parseItem } from "./frontmatter.js";
 import { type ScanHit, scanText } from "./scan.js";
-import { CONTENT_TYPES, frontmatterSchema } from "./schema.js";
-
-/** JSON_SCHEMA keeps dates as written. The default YAML schema would turn 2026-02-30 into a Date. */
-const MATTER_OPTIONS = {
-  engines: {
-    yaml: {
-      parse: (source: string) =>
-        load(source, { schema: JSON_SCHEMA }) as object,
-      stringify: (data: object) => dump(data),
-    },
-  },
-};
+import { CATEGORIES, CONTENT_TYPES, frontmatterSchema } from "./schema.js";
 
 export type Severity = "error" | "warning";
 
@@ -53,21 +41,25 @@ export async function validateContent(
     const file = relative(options.root, absolutePath).split(sep).join("/");
     const raw = await readFile(absolutePath, "utf8");
     const parts = relative(contentRoot, absolutePath).split(sep);
-    const type = parts[0] ?? "";
+    const [pack = "", type = ""] = parts;
 
-    if (!(CONTENT_TYPES as readonly string[]).includes(type)) {
+    // Layout is content/<pack>/<type>/<name>.md. The pack folder is the source of truth.
+    if (
+      parts.length !== 3 ||
+      !(CATEGORIES as readonly string[]).includes(pack) ||
+      !(CONTENT_TYPES as readonly string[]).includes(type)
+    ) {
       findings.push(
         error(
           file,
           "location",
-          `must live under one of: ${CONTENT_TYPES.join(", ")}`,
+          `must live at content/<pack>/<type>/<name>.md, with pack one of: ${CATEGORIES.join(", ")} and type one of: ${CONTENT_TYPES.join(", ")}`,
         ),
       );
       continue;
     }
 
-    const { data } = matter(raw, MATTER_OPTIONS);
-    const parsed = frontmatterSchema.safeParse(data);
+    const parsed = frontmatterSchema.safeParse(parseItem(raw).data);
 
     if (!parsed.success) {
       for (const issue of parsed.error.issues) {
@@ -77,6 +69,16 @@ export async function validateContent(
     } else {
       const item = parsed.data;
       const expectedName = basename(absolutePath, extname(absolutePath));
+
+      if (item.category !== pack) {
+        findings.push(
+          error(
+            file,
+            "category",
+            `category "${item.category}" must match its pack folder "${pack}"`,
+          ),
+        );
+      }
 
       if (item.name !== expectedName) {
         findings.push(
