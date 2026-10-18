@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/arifshariati/sdlckit/blob/main/content/workflow/assets/docs/manifest.schema.json",
+  "$id": "urn:sdlckit:manifest:v1",
   "title": "sdlckit project manifest",
   "description": "Per-repo manifest written by /sdlckit-workflow:eng-init. Records the real gate commands and which domains actually exist in this repo. Read by every engineering command.",
   "type": "object",

@@ -1,7 +1,7 @@
 # Project UI strategy, templates, and themes
 
 Use this when a project needs a UI strategy document, reusable screen templates, or a theme
-control. It is the reusable form of the flowdemo redesign (`docs/ui/UI-STRATEGY.md` in that repo).
+control. It is the reusable form of a strategy document that worked in practice: one page, kept in the repo.
 
 ## 1. Write the strategy first (one page, in the repo)
 
