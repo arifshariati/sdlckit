@@ -1,0 +1,9 @@
+# Every change needs the maintainer's review.
+*                       @arifshariati
+
+# Generated output and the marketplace manifest must match a fresh build.
+/plugins/               @arifshariati
+/.claude-plugin/        @arifshariati
+
+# Release and CI configuration.
+/.github/               @arifshariati

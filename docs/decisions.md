@@ -34,6 +34,8 @@ Decision log from the design interview. Each entry is final unless revisited her
 28. **Routing without CLAUDE.md:** a plugin's `CLAUDE.md` is not loaded, so the bare-request routing (feature → `/po`, change → `/implement`, defect → `/fix`) ships as a skill in `sdlckit-workflow`.
 29. **Public defaults:** shipped content holds no author preferences. Commit and PR attribution follows the user's own settings, and examples use neutral names (acme, a sample monorepo) instead of real projects.
 
+30. **Launch (revisits 14):** the repository went public on 2026-10-18 and was tagged v0.1.0 the same day. Entry 14's private-first plan is superseded. Launch posts follow the same order as before. Community files are in place: CONTRIBUTING.md (DCO sign-off), CODE_OF_CONDUCT.md (Contributor Covenant 2.1), SECURITY.md with private vulnerability reporting enabled, CODEOWNERS, and issue and PR templates.
+
 ## Open topics
 
 None. The design interview is complete. Remaining work is implementation, starting with the validators.
