@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "description": "Model and escalation policy for sdlckit-team. Read by `sdlckit-delivery model`; explained in routing.md.",
+  "tiers": ["haiku", "sonnet", "opus"],
+  "profiles": {
+    "lean": {
+      "tech-lead": "sonnet",
+      "qa-specialist": "sonnet",
+      "solution-architect": "sonnet",
+      "staff-engineer": "sonnet",
+      "product-owner": "sonnet",
+      "ui-ux-designer": "sonnet",
+      "engineer": "sonnet",
+      "engineer@small": "haiku",
+      "technical-writer": "haiku",
+      "delivery-manager": "haiku",
+      "business-analyst": "haiku",
+      "devops-engineer": "sonnet"
+    },
+    "balanced": {
+      "tech-lead": "opus",
+      "qa-specialist": "opus",
+      "solution-architect": "sonnet",
+      "staff-engineer": "sonnet",
+      "product-owner": "sonnet",
+      "ui-ux-designer": "sonnet",
+      "engineer": "sonnet",
+      "technical-writer": "sonnet",
+      "delivery-manager": "sonnet",
+      "business-analyst": "sonnet",
+      "devops-engineer": "sonnet"
+    },
+    "max": {
+      "tech-lead": "opus",
+      "qa-specialist": "opus",
+      "solution-architect": "opus",
+      "staff-engineer": "opus",
+      "product-owner": "opus",
+      "ui-ux-designer": "opus",
+      "engineer": "sonnet",
+      "technical-writer": "sonnet",
+      "delivery-manager": "sonnet",
+      "business-analyst": "sonnet",
+      "devops-engineer": "sonnet"
+    }
+  },
+  "engineers": {
+    "react-web": "frontend-engineer",
+    "vite-build": "frontend-engineer",
+    "react-native": "mobile-engineer",
+    "nestjs": "backend-engineer",
+    "supabase": "data-engineer",
+    "postgres": "data-engineer",
+    "aws": "infra-engineer",
+    "terraform": "infra-engineer",
+    "turbo-monorepo": "infra-engineer",
+    "bedrock-agentcore": "ai-engineer"
+  },
+  "escalation": {
+    "engineerQaRound": 2,
+    "engineerRedGateRuns": 2,
+    "architectOnEpicRisk": "high"
+  }
+}
