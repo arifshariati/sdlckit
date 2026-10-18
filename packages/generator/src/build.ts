@@ -1,10 +1,12 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import {
   CATEGORIES,
   type Frontmatter,
   frontmatterSchema,
   parseItem,
+  RUNTIME_FIELDS,
+  type RuntimeField,
 } from "@sdlckit/validators";
 import { type Pack, packSchema } from "./pack.js";
 
@@ -18,11 +20,17 @@ const SKILL_TYPES = ["skills", "rulebooks"] as const;
 const FLAT_TYPES = ["agents", "commands"] as const;
 /** Types the generator knows how to emit. Anything else under a pack is an error. */
 const SUPPORTED_TYPES = [...SKILL_TYPES, ...FLAT_TYPES] as const;
+/** Pack folders that are not item types: copied as-is into the plugin root (decision 25). */
+const ASSETS_DIR = "assets";
+/** File mode for generated executables in `bin/` (decision 26). */
+export const EXECUTABLE_MODE = 0o755;
 
 /** A generated file. `path` is relative to the repo root and always uses forward slashes. */
 export interface OutputFile {
   path: string;
   contents: string;
+  /** Set only for executables; everything else is written with the default mode. */
+  mode?: number;
 }
 
 /**
@@ -51,7 +59,23 @@ export async function buildPlugins(root: string): Promise<OutputFile[]> {
       contents: json(pluginManifest(pluginName, category, pack)),
     });
 
+    for (const asset of await listFiles(join(packDir, ASSETS_DIR))) {
+      outputs.push({
+        path: `${pluginRoot}/${asset}`,
+        contents: await readFile(join(packDir, ASSETS_DIR, asset), "utf8"),
+      });
+    }
+
+    for (const [command, target] of Object.entries(pack.bin ?? {})) {
+      outputs.push({
+        path: `${pluginRoot}/bin/${command}`,
+        contents: executable(await readBin(root, target, category)),
+        mode: EXECUTABLE_MODE,
+      });
+    }
+
     for (const type of await listTypes(packDir)) {
+      if (type === ASSETS_DIR) continue;
       if (!(SUPPORTED_TYPES as readonly string[]).includes(type)) {
         throw new Error(
           `content/${category}/${type} is not supported by the generator yet. Supported types: ${SUPPORTED_TYPES.join(", ")}`,
@@ -111,6 +135,45 @@ async function listTypes(packDir: string): Promise<string[]> {
     .sort();
 }
 
+/** Every file under `dir`, relative to it with forward slashes. A missing folder has none. */
+async function listFiles(dir: string): Promise<string[]> {
+  let entries: string[];
+  try {
+    entries = await readdir(dir, { recursive: true });
+  } catch (cause) {
+    if ((cause as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw cause;
+  }
+  const files: string[] = [];
+  for (const entry of entries) {
+    if ((await stat(join(dir, entry))).isFile())
+      files.push(entry.split(sep).join("/"));
+  }
+  return files.sort();
+}
+
+async function readBin(
+  root: string,
+  target: string,
+  category: string,
+): Promise<string> {
+  try {
+    return await readFile(join(root, target), "utf8");
+  } catch (cause) {
+    if ((cause as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new Error(
+        `content/${category}/pack.json: bin target ${target} does not exist. Run the build first.`,
+      );
+    }
+    throw cause;
+  }
+}
+
+/** Ensures exactly one Node shebang, so the file runs as a bare command from `bin/`. */
+function executable(source: string): string {
+  return `#!/usr/bin/env node\n${source.replace(/^#!.*\n/, "")}`;
+}
+
 async function listMarkdown(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { recursive: true });
   return entries.filter((entry) => entry.endsWith(".md")).sort();
@@ -144,7 +207,12 @@ function emitItem(
 ): OutputFile {
   const { name, description } = item.frontmatter;
   // JSON strings are valid YAML, so quoting with JSON.stringify is always safe here.
-  const header = `---\nname: ${JSON.stringify(name)}\ndescription: ${JSON.stringify(description)}\n---\n`;
+  // Runtime fields (decision 24) follow in a fixed order, so output is stable.
+  const runtime = (Object.keys(RUNTIME_FIELDS) as RuntimeField[])
+    .filter((field) => item.frontmatter[field] !== undefined)
+    .map((field) => `${field}: ${JSON.stringify(item.frontmatter[field])}\n`)
+    .join("");
+  const header = `---\nname: ${JSON.stringify(name)}\ndescription: ${JSON.stringify(description)}\n${runtime}---\n`;
   // Drop the blank lines gray-matter leaves between the closing fence and the body.
   const body = item.body.replace(/^\s*\n/, "");
   const path = (SKILL_TYPES as readonly string[]).includes(type)

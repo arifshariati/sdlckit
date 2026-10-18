@@ -1,4 +1,11 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -155,6 +162,78 @@ describe("buildPlugins", () => {
     expect(second).toEqual(first);
     expect(paths(first)).toEqual([...paths(first)].sort());
   });
+  it("keeps runtime fields on agents and commands, in a fixed order", async () => {
+    await write("content/workflow/pack.json", JSON.stringify(PACK));
+    await write(
+      "content/workflow/agents/reviewer.md",
+      item("reviewer", "workflow").replace(
+        "claudeCodeVersion: 2.1.0",
+        "claudeCodeVersion: 2.1.0\nskills: [eng-testing]\ntools: Bash, Read\nmodel: opus",
+      ),
+    );
+    const files = await buildPlugins(root);
+    const agent = files.find((f) => f.path.endsWith("agents/reviewer.md"));
+    expect(agent?.contents).toBe(
+      [
+        "---",
+        'name: "reviewer"',
+        'description: "Plan the change before editing any file"',
+        'model: "opus"',
+        'tools: "Bash, Read"',
+        'skills: ["eng-testing"]',
+        "---",
+        "Body text.",
+        "",
+      ].join("\n"),
+    );
+  });
+
+  it("copies assets byte for byte into the plugin root", async () => {
+    await write("content/workflow/pack.json", JSON.stringify(PACK));
+    await write("content/workflow/assets/templates/epic.md", "# {{id}}\n");
+    await write("content/workflow/assets/skills/ui/references/a.md", "ref\n");
+    const files = await buildPlugins(root);
+    expect(files).toContainEqual({
+      path: "plugins/sdlckit-workflow/templates/epic.md",
+      contents: "# {{id}}\n",
+    });
+    expect(paths(files)).toContain(
+      "plugins/sdlckit-workflow/skills/ui/references/a.md",
+    );
+  });
+
+  it("writes each pack bin as an executable with one Node shebang", async () => {
+    await write(
+      "content/workflow/pack.json",
+      JSON.stringify({
+        ...PACK,
+        bin: { "sdlckit-eng": "packages/eng/dist/cli.js" },
+      }),
+    );
+    await write(
+      "packages/eng/dist/cli.js",
+      "#!/usr/bin/env node\nconsole.log(1);\n",
+    );
+    const files = await buildPlugins(root);
+    expect(files).toContainEqual({
+      path: "plugins/sdlckit-workflow/bin/sdlckit-eng",
+      contents: "#!/usr/bin/env node\nconsole.log(1);\n",
+      mode: 0o755,
+    });
+  });
+
+  it("explains a bin target that has not been built", async () => {
+    await write(
+      "content/workflow/pack.json",
+      JSON.stringify({
+        ...PACK,
+        bin: { "sdlckit-eng": "packages/eng/dist/cli.js" },
+      }),
+    );
+    await expect(buildPlugins(root)).rejects.toThrow(
+      "bin target packages/eng/dist/cli.js does not exist. Run the build first.",
+    );
+  });
 });
 
 describe("writeOutputs and checkOutputs", () => {
@@ -213,5 +292,20 @@ describe("writeOutputs and checkOutputs", () => {
     expect(problems).toContain(
       "stale, not generated: plugins/sdlckit-workflow/skills/old/SKILL.md",
     );
+  });
+  it("reports an executable whose mode changed", async () => {
+    const withBin: OutputFile[] = [
+      ...files,
+      {
+        path: "plugins/sdlckit-workflow/bin/tool",
+        contents: "x\n",
+        mode: 0o755,
+      },
+    ];
+    await writeOutputs(root, withBin);
+    await chmod(join(root, "plugins/sdlckit-workflow/bin/tool"), 0o644);
+    expect(await checkOutputs(root, withBin)).toEqual([
+      "wrong mode: plugins/sdlckit-workflow/bin/tool is 644, expected 755",
+    ]);
   });
 });

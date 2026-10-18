@@ -1,5 +1,13 @@
 import type { Dirent } from "node:fs";
-import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  chmod,
+  mkdir,
+  readdir,
+  readFile,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { dirname, join, relative, sep } from "node:path";
 import type { OutputFile } from "./build.js";
 
@@ -18,6 +26,7 @@ export async function writeOutputs(
     const target = join(root, file.path);
     await mkdir(dirname(target), { recursive: true });
     await writeFile(target, file.contents);
+    if (file.mode !== undefined) await chmod(target, file.mode);
   }
 }
 
@@ -38,6 +47,13 @@ export async function checkOutputs(
       problems.push(`missing: ${file.path}`);
     } else if (onDisk !== file.contents) {
       problems.push(`out of date: ${file.path}`);
+    } else if (file.mode !== undefined) {
+      const mode = (await stat(join(root, file.path))).mode & 0o777;
+      if (mode !== file.mode) {
+        problems.push(
+          `wrong mode: ${file.path} is ${mode.toString(8)}, expected ${file.mode.toString(8)}`,
+        );
+      }
     }
   }
 

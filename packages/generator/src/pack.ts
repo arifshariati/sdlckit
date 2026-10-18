@@ -16,6 +16,21 @@ export const packSchema = z.object({
   dependencies: z
     .array(z.string().regex(KEBAB_CASE, "dependency names must be kebab-case"))
     .optional(),
+  /**
+   * Executables (decision 26): command name → a workspace package's bundled file, relative
+   * to the repo root. Each is written to the plugin's `bin/`, which Claude Code puts on PATH.
+   */
+  bin: z
+    .record(
+      z.string().regex(KEBAB_CASE, "bin names must be kebab-case"),
+      z
+        .string()
+        .regex(
+          /^packages\/[^.][^\s]*\.js$/,
+          "bin targets must be a packages/**/*.js file",
+        ),
+    )
+    .optional(),
 });
 
 export type Pack = z.infer<typeof packSchema>;
