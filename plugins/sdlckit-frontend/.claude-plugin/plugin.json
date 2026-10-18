@@ -1,0 +1,19 @@
+{
+  "name": "sdlckit-frontend",
+  "version": "0.1.0",
+  "description": "Frontend experts and rulebooks for React, React Native and Vite, plus ui-craft, the UI quality standard for Tailwind, shadcn and NativeWind.",
+  "author": {
+    "name": "Mohammad Arif"
+  },
+  "homepage": "https://github.com/arifshariati/sdlckit",
+  "repository": "https://github.com/arifshariati/sdlckit",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "sdlc",
+    "frontend"
+  ],
+  "dependencies": [
+    "sdlckit-workflow"
+  ]
+}

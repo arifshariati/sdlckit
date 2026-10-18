@@ -1,0 +1,26 @@
+{
+  "name": "@sdlckit/eng",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Engineering workflow CLI shipped as sdlckit-eng in the workflow plugin: repo gates from the project manifest, stack detection, metrics, and Mermaid validation.",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "sdlckit-eng": "./dist/bin.cjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsup": "^8.5.1",
+    "vitest": "^5.0.3"
+  }
+}

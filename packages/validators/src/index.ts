@@ -5,6 +5,8 @@ export {
   CONTENT_TYPES,
   type Frontmatter,
   frontmatterSchema,
+  RUNTIME_FIELDS,
+  type RuntimeField,
 } from "./schema.js";
 export {
   type Finding,

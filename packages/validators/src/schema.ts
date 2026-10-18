@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-/** The six installable packs. Each maps to one plugin in the marketplace. */
+/** The installable packs. Each maps to one plugin in the marketplace (decisions 16 and 23). */
 export const CATEGORIES = [
   "workflow",
   "cost",
@@ -8,6 +8,7 @@ export const CATEGORIES = [
   "frontend",
   "cicd",
   "infra",
+  "team",
 ] as const;
 
 /** Content folders under `content/`. Each folder holds one item type. */
@@ -20,6 +21,23 @@ export const CONTENT_TYPES = [
 ] as const;
 
 const KEBAB_CASE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+/** A skill reference: `name`, or `plugin:name` for a skill in another plugin. */
+const SKILL_REF = /^([a-z0-9]+(-[a-z0-9]+)*:)?[a-z0-9]+(-[a-z0-9]+)*$/;
+
+/**
+ * Runtime fields Claude Code reads, kept in generated output (decision 24).
+ * Each belongs to the item types listed; the validator rejects it anywhere else.
+ */
+export const RUNTIME_FIELDS = {
+  model: ["agents", "commands"],
+  tools: ["agents"],
+  effort: ["agents"],
+  skills: ["agents"],
+  "argument-hint": ["commands"],
+  "allowed-tools": ["commands"],
+} as const satisfies Record<string, readonly string[]>;
+
+export type RuntimeField = keyof typeof RUNTIME_FIELDS;
 const SEMVER = /^\d+\.\d+\.\d+$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -47,6 +65,17 @@ export const frontmatterSchema = z
       .string()
       .min(1, "must name the Claude Code version it was verified against"),
     replacedBy: z.string().min(1).optional(),
+    model: z.string().min(1).optional(),
+    tools: z.string().min(1).optional(),
+    effort: z.enum(["low", "medium", "high", "xhigh", "max"]).optional(),
+    skills: z
+      .array(
+        z.string().regex(SKILL_REF, "must be a skill name or plugin:skill"),
+      )
+      .min(1)
+      .optional(),
+    "argument-hint": z.string().min(1).optional(),
+    "allowed-tools": z.string().min(1).optional(),
   })
   .superRefine((item, ctx) => {
     if (item.status === "superseded" && !item.replacedBy) {

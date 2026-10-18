@@ -1,8 +1,14 @@
-import { readdir, readFile } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import { basename, extname, join, relative, sep } from "node:path";
 import { parseItem } from "./frontmatter.js";
 import { type ScanHit, scanText } from "./scan.js";
-import { CATEGORIES, CONTENT_TYPES, frontmatterSchema } from "./schema.js";
+import {
+  CATEGORIES,
+  CONTENT_TYPES,
+  frontmatterSchema,
+  RUNTIME_FIELDS,
+  type RuntimeField,
+} from "./schema.js";
 
 export type Severity = "error" | "warning";
 
@@ -37,11 +43,21 @@ export async function validateContent(
   const now = options.now ?? new Date();
   const staleAfterDays = options.staleAfterDays ?? DEFAULT_STALE_DAYS;
 
+  // Assets (decision 25) are not items: no layout or frontmatter rules, but publish safety still applies.
+  for (const absolutePath of await listAssetFiles(contentRoot)) {
+    const file = relative(options.root, absolutePath).split(sep).join("/");
+    const raw = await readFile(absolutePath, "utf8");
+    for (const hit of scanText(raw, options.denylist ?? [])) {
+      findings.push(scanFinding(file, hit));
+    }
+  }
+
   for (const absolutePath of files) {
     const file = relative(options.root, absolutePath).split(sep).join("/");
     const raw = await readFile(absolutePath, "utf8");
     const parts = relative(contentRoot, absolutePath).split(sep);
     const [pack = "", type = ""] = parts;
+    if (parts[1] === "assets") continue;
 
     // Layout is content/<pack>/<type>/<name>.md. The pack folder is the source of truth.
     if (
@@ -90,6 +106,19 @@ export async function validateContent(
         );
       }
 
+      for (const field of Object.keys(RUNTIME_FIELDS) as RuntimeField[]) {
+        const allowed: readonly string[] = RUNTIME_FIELDS[field];
+        if (item[field] !== undefined && !allowed.includes(type)) {
+          findings.push(
+            error(
+              file,
+              "runtime-field",
+              `"${field}" applies only to ${allowed.join(" and ")}, not ${type}`,
+            ),
+          );
+        }
+      }
+
       const previous = seenNames.get(item.name);
       if (previous) {
         findings.push(
@@ -136,6 +165,24 @@ async function listMarkdownFiles(dir: string): Promise<string[]> {
   return entries
     .filter((entry) => entry.endsWith(".md"))
     .map((entry) => join(dir, entry));
+}
+
+/** Every file under `content/<pack>/assets/`, any extension. */
+async function listAssetFiles(contentRoot: string): Promise<string[]> {
+  let entries: string[];
+  try {
+    entries = await readdir(contentRoot, { recursive: true });
+  } catch (cause) {
+    if ((cause as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw cause;
+  }
+  const files: string[] = [];
+  for (const entry of entries) {
+    if (entry.split(sep)[1] !== "assets") continue;
+    const absolute = join(contentRoot, entry);
+    if ((await stat(absolute)).isFile()) files.push(absolute);
+  }
+  return files.sort();
 }
 
 function isStale(verified: string, now: Date, staleAfterDays: number): boolean {

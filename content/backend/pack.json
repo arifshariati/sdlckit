@@ -1,0 +1,5 @@
+{
+  "version": "0.1.0",
+  "description": "Backend experts and rulebooks for NestJS, PostgreSQL and Supabase. They review changes only in repos where those domains are present.",
+  "dependencies": ["sdlckit-workflow"]
+}

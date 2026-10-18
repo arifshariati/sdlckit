@@ -1,0 +1,5 @@
+{
+  "version": "0.1.0",
+  "description": "The core engineering workflow: plan with the right specialists, implement, prove it with the project's real gates, review the diff, fix, and reach PR-readiness.",
+  "bin": { "sdlckit-eng": "packages/eng/dist/bin.cjs" }
+}

@@ -1,0 +1,391 @@
+#!/usr/bin/env node
+"use strict";
+
+// src/cli.ts
+var import_node_path5 = require("path");
+
+// src/detect.ts
+var import_node_fs = require("fs");
+var import_node_path = require("path");
+var EXCLUDED_DIRS = /* @__PURE__ */ new Set([
+  "node_modules",
+  ".git",
+  "dist",
+  "build",
+  ".next",
+  ".turbo",
+  "coverage",
+  ".expo",
+  ".delivery"
+]);
+function detectStack(root) {
+  const files = walk(root);
+  const packages = files.filter((f) => f.endsWith("package.json")).map((f) => readJson((0, import_node_path.join)(root, f))).filter((p) => p !== void 0);
+  const deps = new Set(
+    packages.flatMap((p) => [
+      ...Object.keys(p.dependencies ?? {}),
+      ...Object.keys(p.devDependencies ?? {}),
+      ...Object.keys(p.peerDependencies ?? {})
+    ])
+  );
+  const has = (path) => (0, import_node_fs.existsSync)((0, import_node_path.join)(root, path));
+  const rootPkg = readJson((0, import_node_path.join)(root, "package.json"));
+  let packageManager = "none";
+  if (has("package-lock.json")) packageManager = "npm";
+  if (has("yarn.lock")) packageManager = "yarn";
+  if (has("pnpm-lock.yaml")) packageManager = "pnpm";
+  if (has("bun.lockb") || has("bun.lock")) packageManager = "bun";
+  if (has("Cargo.toml")) packageManager = "cargo";
+  if (has("go.mod")) packageManager = "go";
+  if (rootPkg?.packageManager)
+    packageManager = rootPkg.packageManager.split("@")[0] ?? packageManager;
+  let monorepo = "none";
+  if (has("pnpm-workspace.yaml")) monorepo = "pnpm-workspaces";
+  if (has("lerna.json")) monorepo = "lerna";
+  if (has("nx.json")) monorepo = "nx";
+  if (has("turbo.json")) monorepo = "turbo";
+  const anyFile = (test) => files.some(test);
+  const reactNative = deps.has("react-native") || deps.has("expo");
+  const reactWeb = deps.has("react-dom") || deps.has("react") && !reactNative;
+  const supabase = has("supabase") || deps.has("@supabase/supabase-js");
+  const terraform = anyFile((f) => f.endsWith(".tf"));
+  const domains = {
+    "react-web": reactWeb,
+    "react-native": reactNative,
+    nestjs: deps.has("@nestjs/core"),
+    "vite-build": deps.has("vite"),
+    supabase,
+    postgres: supabase || deps.has("pg") || deps.has("postgres") || anyFile((f) => /migrations\/.*\.sql$/.test(f)),
+    terraform,
+    aws: terraform || [...deps].some(
+      (d) => d === "aws-sdk" || d.startsWith("@aws-sdk/") || d === "aws-cdk-lib"
+    ),
+    "bedrock-agentcore": [...deps].some((d) => d.includes("bedrock")),
+    "turbo-monorepo": monorepo === "turbo"
+  };
+  const run = runPrefix(packageManager);
+  const script = (name) => rootPkg?.scripts?.[name] ? `${run} ${name}` : "";
+  const gateCandidates = {
+    lint: script("lint"),
+    format: script("format:check") || script("format") || (deps.has("prettier") ? `${run} prettier --check .` : ""),
+    typecheck: script("typecheck") || script("type-check"),
+    test: script("test"),
+    e2e: script("test:e2e") || script("e2e") || (deps.has("@playwright/test") ? "(playwright present: confirm the target)" : ""),
+    build: script("build")
+  };
+  return { root, packageManager, monorepo, domains, gateCandidates };
+}
+function runPrefix(pm) {
+  if (pm === "npm") return "npm run";
+  if (pm === "bun") return "bun run";
+  return pm;
+}
+function walk(root, dir = root, out = [], depth = 0) {
+  if (depth > 8) return out;
+  let entries;
+  try {
+    entries = (0, import_node_fs.readdirSync)(dir);
+  } catch {
+    return out;
+  }
+  for (const entry of entries) {
+    if (EXCLUDED_DIRS.has(entry)) continue;
+    const full = (0, import_node_path.join)(dir, entry);
+    let isDir = false;
+    try {
+      isDir = (0, import_node_fs.statSync)(full).isDirectory();
+    } catch {
+      continue;
+    }
+    if (isDir) walk(root, full, out, depth + 1);
+    else out.push((0, import_node_path.relative)(root, full).split("\\").join("/"));
+  }
+  return out;
+}
+function readJson(file) {
+  try {
+    return JSON.parse((0, import_node_fs.readFileSync)(file, "utf8"));
+  } catch {
+    return void 0;
+  }
+}
+
+// src/gates.ts
+var import_node_child_process2 = require("child_process");
+
+// src/manifest.ts
+var import_node_child_process = require("child_process");
+var import_node_fs2 = require("fs");
+var import_node_path2 = require("path");
+var MANIFEST_PATH = ".claude/engineering.json";
+var ManifestError = class extends Error {
+};
+function workTreeRoot(cwd) {
+  return git(["rev-parse", "--show-toplevel"], cwd);
+}
+function readManifest(root) {
+  const file = (0, import_node_path2.join)(root, MANIFEST_PATH);
+  if (!(0, import_node_fs2.existsSync)(file)) {
+    throw new ManifestError(`no manifest at ${file}. Run /eng-init first.`);
+  }
+  return JSON.parse((0, import_node_fs2.readFileSync)(file, "utf8"));
+}
+function git(args, cwd) {
+  try {
+    return (0, import_node_child_process.execFileSync)("git", args, {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"]
+    }).trim();
+  } catch {
+    throw new ManifestError(`not inside a git repository: ${cwd}`);
+  }
+}
+
+// src/gates.ts
+var DEFAULT_GATES = ["format", "lint", "typecheck", "test"];
+function runGates(cwd, gates = DEFAULT_GATES) {
+  const root = workTreeRoot(cwd);
+  const manifest = readManifest(root);
+  const results = [];
+  for (const gate of gates) {
+    const command = manifest.gates[gate] ?? null;
+    if (!command) {
+      results.push({
+        gate,
+        command: null,
+        status: "skip",
+        exitCode: null,
+        output: ""
+      });
+      continue;
+    }
+    const run = (0, import_node_child_process2.spawnSync)("sh", ["-c", command], {
+      cwd: root,
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024
+    });
+    const output = `${run.stdout ?? ""}${run.stderr ?? ""}`;
+    results.push({
+      gate,
+      command,
+      status: run.status === 0 ? "pass" : "fail",
+      exitCode: run.status,
+      output
+    });
+  }
+  return { root, results, passed: results.every((r) => r.status !== "fail") };
+}
+function formatGates(run) {
+  const lines = [`=== Deterministic gates (${run.root}) ===`];
+  for (const r of run.results) {
+    if (r.status === "skip") {
+      lines.push(`\u2022 ${r.gate.padEnd(12)} SKIP (not configured in manifest)`);
+      continue;
+    }
+    lines.push(
+      "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
+      `\u25B6 ${r.gate}: ${r.command}`
+    );
+    if (r.output.trim()) lines.push(r.output.trimEnd());
+    lines.push(
+      r.status === "pass" ? `\u2713 ${r.gate.padEnd(12)} PASS` : `\u2717 ${r.gate.padEnd(12)} FAIL (exit ${r.exitCode})`
+    );
+  }
+  lines.push(
+    "========================================",
+    run.passed ? "GATES: PASS" : "GATES: FAIL"
+  );
+  return `${lines.join("\n")}
+`;
+}
+
+// src/mermaid.ts
+var import_node_child_process3 = require("child_process");
+var import_node_fs3 = require("fs");
+var import_node_os = require("os");
+var import_node_path3 = require("path");
+function mermaidBlocks(markdown) {
+  return [...markdown.matchAll(/```mermaid\n([\s\S]*?)\n```/g)].map(
+    (m) => m[1] ?? ""
+  );
+}
+function validateMermaid(file) {
+  const blocks = mermaidBlocks((0, import_node_fs3.readFileSync)(file, "utf8"));
+  if (blocks.length === 0) return [];
+  const dir = (0, import_node_fs3.mkdtempSync)((0, import_node_path3.join)((0, import_node_os.tmpdir)(), "sdlckit-mermaid-"));
+  try {
+    (0, import_node_fs3.writeFileSync)((0, import_node_path3.join)(dir, "puppeteer.json"), '{"args":["--no-sandbox"]}');
+    return blocks.map((block, index) => {
+      const input = (0, import_node_path3.join)(dir, `d${index}.mmd`);
+      (0, import_node_fs3.writeFileSync)(input, `${block}
+`);
+      const run = (0, import_node_child_process3.spawnSync)(
+        "npx",
+        [
+          "-y",
+          "@mermaid-js/mermaid-cli",
+          "-p",
+          (0, import_node_path3.join)(dir, "puppeteer.json"),
+          "-i",
+          input,
+          "-o",
+          (0, import_node_path3.join)(dir, `d${index}.svg`)
+        ],
+        { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
+      );
+      const output = `${run.stdout ?? ""}${run.stderr ?? ""}`.split("\n").slice(-8).join("\n");
+      return { index, ok: run.status === 0, output };
+    });
+  } finally {
+    (0, import_node_fs3.rmSync)(dir, { recursive: true, force: true });
+  }
+}
+
+// src/metrics.ts
+var import_node_fs4 = require("fs");
+var import_node_os2 = require("os");
+var import_node_path4 = require("path");
+function dataDir(flag) {
+  return flag || process.env.SDLCKIT_DATA || (0, import_node_path4.join)((0, import_node_os2.homedir)(), ".sdlckit");
+}
+function eventsFile(data, project) {
+  if (!/^[\w.-]+$/.test(project))
+    throw new Error(`invalid project name: ${project}`);
+  return (0, import_node_path4.join)(data, "metrics", project, "events.jsonl");
+}
+function captureMetric(data, project, record, now = /* @__PURE__ */ new Date()) {
+  const file = eventsFile(data, project);
+  (0, import_node_fs4.mkdirSync)((0, import_node_path4.join)(file, ".."), { recursive: true });
+  (0, import_node_fs4.appendFileSync)(
+    file,
+    `${JSON.stringify({ ...record, ts: now.toISOString() })}
+`
+  );
+  return file;
+}
+function metricsReport(data, project, since = "") {
+  const file = eventsFile(data, project);
+  if (!(0, import_node_fs4.existsSync)(file)) {
+    return `No metrics yet for '${project}'. Run /implement, /fix, or /pr-ready to generate some.
+`;
+  }
+  const rows = (0, import_node_fs4.readFileSync)(file, "utf8").split("\n").filter(Boolean).flatMap((line) => {
+    try {
+      return [JSON.parse(line)];
+    } catch {
+      return [];
+    }
+  }).filter((r) => !since || String(r.ts ?? "") >= since);
+  const of = (event) => rows.filter((r) => r.event === event);
+  const by = (list, key) => list.reduce((acc, r) => {
+    const k = String(r[key] ?? "?");
+    acc[k] = (acc[k] ?? 0) + 1;
+    return acc;
+  }, {});
+  const pct = (n, d) => d ? Math.round(100 * n / d) : 0;
+  const runs = of("run");
+  const findings = of("finding");
+  const rounds = of("review_round");
+  const falsePositives = of("false_positive");
+  const durations = runs.map((r) => r.duration_s).filter((x) => typeof x === "number");
+  const autoFixed = findings.filter((f) => f.auto_fixed === true).length;
+  return [
+    `# Engineering report: ${project}`,
+    `Window: ${since || "all time"}   Records: ${rows.length}`,
+    "",
+    `## Runs (${runs.length})`,
+    `  by command: ${JSON.stringify(by(runs, "command"))}`,
+    `  by change_type: ${JSON.stringify(by(runs, "change_type"))}`,
+    `  avg duration_s: ${durations.length ? (durations.reduce((a, b) => a + b, 0) / durations.length).toFixed(1) : "-"}`,
+    "",
+    `## Findings (${findings.length})`,
+    `  by severity: ${JSON.stringify(by(findings, "severity"))}`,
+    `  by category: ${JSON.stringify(by(findings, "category"))}`,
+    `  auto-fixed: ${autoFixed}/${findings.length} (${pct(autoFixed, findings.length)}%)`,
+    "",
+    "## Review rounds",
+    `  total rounds: ${rounds.length}   avg rounds/run: ${runs.length ? (rounds.length / runs.length).toFixed(2) : "-"}`,
+    "",
+    `## False positives (${falsePositives.length})`,
+    `  FP rate: ${pct(falsePositives.length, findings.length)}% of findings`,
+    "",
+    "## North-star",
+    `  human PR comments logged: ${findings.filter((f) => f.source === "human_pr").length}  (goal: trending down over time)`,
+    ""
+  ].join("\n");
+}
+
+// src/cli.ts
+var USAGE = `sdlckit-eng <command>
+  gates [gate ...]                         run the manifest's gate commands (default: ${DEFAULT_GATES.join(" ")})
+  detect [root]                            report package manager, monorepo, domains, gate candidates (JSON)
+  metrics capture <project> <json> [--data DIR]
+  metrics report <project> [since] [--data DIR]
+  mermaid <file.md>                        parse every mermaid block with the real Mermaid CLI`;
+function main(argv) {
+  const dataIndex = argv.indexOf("--data");
+  const data = dataIndex >= 0 ? argv[dataIndex + 1] : void 0;
+  const args = dataIndex >= 0 ? argv.filter((_, i) => i !== dataIndex && i !== dataIndex + 1) : argv;
+  const [command, ...rest] = args;
+  switch (command) {
+    case "gates": {
+      const run = runGates(process.cwd(), rest.length ? rest : DEFAULT_GATES);
+      process.stdout.write(formatGates(run));
+      return run.passed ? 0 : 1;
+    }
+    case "detect":
+      process.stdout.write(
+        `${JSON.stringify(detectStack((0, import_node_path5.resolve)(rest[0] ?? ".")), null, 2)}
+`
+      );
+      return 0;
+    case "metrics": {
+      const [sub, project, extra] = rest;
+      if (!project) break;
+      if (sub === "capture" && extra) {
+        const file = captureMetric(
+          dataDir(data),
+          project,
+          JSON.parse(extra)
+        );
+        process.stdout.write(`metrics: appended to ${file}
+`);
+        return 0;
+      }
+      if (sub === "report") {
+        process.stdout.write(metricsReport(dataDir(data), project, extra));
+        return 0;
+      }
+      break;
+    }
+    case "mermaid": {
+      if (!rest[0]) break;
+      const results = validateMermaid(rest[0]);
+      if (results.length === 0)
+        process.stdout.write(`mermaid: no mermaid blocks in ${rest[0]}
+`);
+      for (const r of results) {
+        process.stdout.write(
+          r.ok ? `\u2713 block ${r.index} parses
+` : `\u2717 block ${r.index} FAILED to parse:
+${r.output}
+`
+        );
+      }
+      return results.every((r) => r.ok) ? 0 : 1;
+    }
+  }
+  process.stdout.write(`${USAGE}
+`);
+  return command ? 2 : 0;
+}
+try {
+  process.exitCode = main(process.argv.slice(2));
+} catch (cause) {
+  process.stderr.write(
+    `sdlckit-eng: ${cause instanceof Error ? cause.message : String(cause)}
+`
+  );
+  process.exitCode = 3;
+}

@@ -1,0 +1,19 @@
+{
+  "name": "sdlckit-infra",
+  "version": "0.1.0",
+  "description": "Infrastructure experts and rulebooks for AWS, Terraform and AI agent systems. Dormant in repos without those domains; never applies or deploys anything.",
+  "author": {
+    "name": "Mohammad Arif"
+  },
+  "homepage": "https://github.com/arifshariati/sdlckit",
+  "repository": "https://github.com/arifshariati/sdlckit",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "sdlc",
+    "infra"
+  ],
+  "dependencies": [
+    "sdlckit-workflow"
+  ]
+}

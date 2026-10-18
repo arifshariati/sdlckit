@@ -1,0 +1,19 @@
+{
+  "name": "sdlckit-backend",
+  "version": "0.1.0",
+  "description": "Backend experts and rulebooks for NestJS, PostgreSQL and Supabase. They review changes only in repos where those domains are present.",
+  "author": {
+    "name": "Mohammad Arif"
+  },
+  "homepage": "https://github.com/arifshariati/sdlckit",
+  "repository": "https://github.com/arifshariati/sdlckit",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "sdlc",
+    "backend"
+  ],
+  "dependencies": [
+    "sdlckit-workflow"
+  ]
+}

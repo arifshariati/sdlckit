@@ -210,4 +210,69 @@ describe("validateContent", () => {
     const findings = await run(["projectzebra"]);
     expect(findings.some((f) => f.rule === "scan:denylist")).toBe(true);
   });
+  it("accepts runtime fields on the item types that use them", async () => {
+    await write(
+      "content/team/agents/tech-lead.md",
+      item({
+        name: "tech-lead",
+        category: "team",
+        model: "opus",
+        tools: "Bash, Read",
+        effort: "high",
+        skills: "[delivery-tickets, sdlckit-workflow:eng-testing]",
+      }),
+    );
+    await write(
+      "content/team/commands/refine.md",
+      item({
+        name: "refine",
+        category: "team",
+        "argument-hint": '"<E-###>"',
+        "allowed-tools": "Bash, Read",
+      }),
+    );
+    expect(await run()).toEqual([]);
+  });
+
+  it("rejects a runtime field on an item type that does not use it", async () => {
+    await write(
+      "content/workflow/skills/plan-first.md",
+      item({ tools: "Bash" }),
+    );
+    const findings = await run();
+    expect(findings).toContainEqual(
+      expect.objectContaining({
+        rule: "runtime-field",
+        message: '"tools" applies only to agents, not skills',
+      }),
+    );
+  });
+
+  it("rejects a skills entry that is not a skill reference", async () => {
+    await write(
+      "content/team/agents/tech-lead.md",
+      item({ name: "tech-lead", category: "team", skills: "[Not A Skill]" }),
+    );
+    const findings = await run();
+    expect(
+      findings.some(
+        (f) => f.rule === "frontmatter" && f.message.startsWith("skills.0"),
+      ),
+    ).toBe(true);
+  });
+
+  it("scans assets for publish safety without treating them as items", async () => {
+    await write("content/team/assets/templates/epic.md", "# {{title}}\n");
+    await write(
+      "content/team/assets/routing.json",
+      '{ "note": "see /Users/someone/notes" }\n',
+    );
+    const findings = await run();
+    expect(findings).toEqual([
+      expect.objectContaining({
+        file: "content/team/assets/routing.json",
+        rule: "scan:machine-path",
+      }),
+    ]);
+  });
 });

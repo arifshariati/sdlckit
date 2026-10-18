@@ -1,0 +1,11 @@
+{
+  "version": "0.1.0",
+  "description": "The delivery team: a PO interviews you, architect, tech lead and staff engineer plan, a designer specs the UI, engineers build in worktrees, QA verifies with evidence, and you approve at three gates.",
+  "dependencies": [
+    "sdlckit-workflow",
+    "sdlckit-backend",
+    "sdlckit-frontend",
+    "sdlckit-infra"
+  ],
+  "bin": { "sdlckit-delivery": "packages/delivery/dist/bin.cjs" }
+}
