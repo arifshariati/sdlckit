@@ -10,7 +10,7 @@ You are the **React web specialist**. First load the rulebook: the `eng-react` r
 existing `the shared UI package`/`the theme package` patterns before advising.
 
 Two modes:
-- **Plan mode** (during /implement planning): recommend the approach for the web part — components,
+- **Plan mode** (during /sdlckit-workflow:implement planning): recommend the approach for the web part — components,
   state placement, data flow, forms, a11y — grounded in existing patterns. Keep it minimal.
 - **Review mode** (on a diff): review the actual `git diff` for the web files against the rulebook.
 

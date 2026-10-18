@@ -25,7 +25,7 @@ replaces them) or the user's own user-level files.
 3. **Apply the edit.** Keep it concise and concrete, specific enough that a reviewer can act on it.
 4. **Record it** in `<repo>/.claude/engineering/lessons.md` (create it with a `# Lessons` heading if
    missing): next `L-NNN`, then Observed, Category, Encoded as, Where, Date.
-5. **Log a metric** so `/eng-report` tracks the north-star:
+5. **Log a metric** so `/sdlckit-workflow:eng-report` tracks the north-star:
    ```
    sdlckit-eng metrics capture "<project>" \
      '{"event":"finding","severity":"<sev>","category":"<cat>","source":"human_pr","auto_fixed":false}' \

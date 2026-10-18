@@ -14,7 +14,7 @@ You are the **fix orchestrator** (main thread). Spec: `${CLAUDE_PLUGIN_ROOT}/doc
 Defect: **$ARGUMENTS**
 
 ## Steps
-1. Load `<repo>/.claude/engineering.json` (if missing, offer `/eng-init`, then stop).
+1. Load `<repo>/.claude/engineering.json` (if missing, offer `/sdlckit-workflow:eng-init`, then stop).
 2. **Investigate → root cause.** Reproduce or trace the defect from evidence (code, logs, tests,
    `git log`/`git blame` of the area). State the **root cause**, not just the symptom. If you can't
    establish it, say `TBD / requires evidence` and ask for what's missing — do not guess-fix.

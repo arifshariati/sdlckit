@@ -10,7 +10,7 @@ argument-hint: "<natural-language requirement>"
 allowed-tools: Bash, Read, Write, Edit, Glob, Grep, Task, TodoWrite
 ---
 You are the **orchestrator** for the sdlckit workflow, running in the main thread.
-Spec: `${CLAUDE_PLUGIN_ROOT}/docs/workflow.md`. Routing: `${CLAUDE_PLUGIN_ROOT}/docs/routing.md`.
+Spec: `${CLAUDE_PLUGIN_ROOT}/docs/workflow.md`. Routing: `${CLAUDE_PLUGIN_ROOT}/skills/review-routing/SKILL.md`.
 Findings contract: the `findings-contract` rulebook.
 
 Requirement: **$ARGUMENTS**
@@ -20,7 +20,7 @@ Requirement: **$ARGUMENTS**
 > main thread must own coherent edits). Dispatch independent specialists **in parallel** via Task.
 
 ## 0. Preconditions
-- Load `<repo>/.claude/engineering.json`. If missing, tell the user to run `/eng-init` first
+- Load `<repo>/.claude/engineering.json`. If missing, tell the user to run `/sdlckit-workflow:eng-init` first
   (offer to run it), then stop.
 
 ## 1. Classify
@@ -29,7 +29,7 @@ Requirement: **$ARGUMENTS**
 
 ## 2. Compute routing
 - `active_domains = (domains the change will touch) ∩ (manifest domains with present:true)`.
-- Apply the routing matrix + risk rules from `routing.md`. Decide which specialists fire and
+- Apply the routing matrix + risk rules from the `review-routing` rulebook. Decide which specialists fire and
   whether this is a **small / normal / high-risk** workflow. Record the plan with TodoWrite.
 - For **small** changes, skip multi-agent review (classify → implement → format/lint/typecheck →
   affected tests) and jump to §5.
@@ -69,7 +69,7 @@ Requirement: **$ARGUMENTS**
 - Dispatch `sdlckit-workflow:pr-readiness` (Opus) — or inline the Definition of Done if that agent isn't built yet
   — producing the DoD table (architecture/impl/format/lint/typecheck/tests/security/domain/
   code-review all PASS, blockers 0, majors 0) and READY / NOT READY with required actions.
-- If READY, draft the PR description following `${CLAUDE_PLUGIN_ROOT}/docs/pr-template.md` (repo's own
+- If READY, draft the PR description following `${CLAUDE_PLUGIN_ROOT}/skills/pr-template/SKILL.md` (repo's own
   `.github/pull_request_template.md` wins if present), including a Mermaid diagram when the
   template's rule applies. Fill Testing from the real gate output and Risks from review findings.
   Present it to the user; opening the PR is their call.

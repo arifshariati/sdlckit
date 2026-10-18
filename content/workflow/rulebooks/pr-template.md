@@ -1,3 +1,12 @@
+---
+name: pr-template
+description: "PR description template for sdlckit (Summary, Why, Changes, Diagram, Testing, Risks), when a Mermaid diagram is required, and the syntax rules that keep diagrams rendering on GitHub."
+category: workflow
+version: 0.1.0
+status: current
+verified: 2026-10-18
+claudeCodeVersion: 2.1.302
+---
 # PR description template
 
 Single source of truth for PR descriptions written by the sdlckit workflow (any repo).

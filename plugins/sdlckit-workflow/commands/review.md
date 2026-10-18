@@ -5,17 +5,17 @@ argument-hint: "[optional focus, e.g. 'security only' or a path]"
 allowed-tools: "Bash, Read, Glob, Grep, Task, TodoWrite"
 ---
 You are the **review orchestrator** (main thread). Spec: `${CLAUDE_PLUGIN_ROOT}/docs/workflow.md`.
-Routing: `${CLAUDE_PLUGIN_ROOT}/docs/routing.md`. Contract: the `findings-contract` rulebook.
+Routing: `${CLAUDE_PLUGIN_ROOT}/skills/review-routing/SKILL.md`. Contract: the `findings-contract` rulebook.
 
 Optional focus: **$ARGUMENTS**
 
 ## Steps
-1. Load `<repo>/.claude/engineering.json`. If missing, tell the user to run `/eng-init` (offer to),
+1. Load `<repo>/.claude/engineering.json`. If missing, tell the user to run `/sdlckit-workflow:eng-init` (offer to),
    then stop.
 2. `git status` + `git diff` (include staged). This diff is the **source of truth**. If the tree is
    clean, review the diff vs the base branch (e.g. `git diff origin/main...`), or ask the user.
 3. Dispatch the `sdlckit-workflow:change-classifier` (Haiku) to get change_type, domains, risk, signals.
-4. Compute `active_domains = touched ∩ manifest.present` and select reviewers per `routing.md`
+4. Compute `active_domains = touched ∩ manifest.present` and select reviewers per the `review-routing` rulebook
    (honor any focus in $ARGUMENTS). Always include `sdlckit-workflow:code-reviewer`; include `sdlckit-workflow:security-reviewer` on
    meaningful changes and `sdlckit-workflow:testing-reviewer` on behavior changes; add domain specialists (review
    mode) and `sdlckit-workflow:performance-reviewer` on perf/DB/async signals.
@@ -24,9 +24,9 @@ Optional focus: **$ARGUMENTS**
 6. **Consolidate** into one report: de-duplicate overlapping findings, rank by severity then
    confidence, group by file. Show totals (blockers / majors / minors / suggestions) and list each
    finding with file:line, problem, recommendation, and which agent raised it.
-7. This command **does not fix** anything. End by offering: "Run `/implement`-style fixes for the
+7. This command **does not fix** anything. End by offering: "Run `/sdlckit-workflow:implement`-style fixes for the
    blockers/majors?" and stop. If the user asked for fixes in $ARGUMENTS, then run the fix loop
-   from `/implement` §7 (max 2 iterations) and re-validate.
+   from `/sdlckit-workflow:implement` §7 (max 2 iterations) and re-validate.
 
 ## Guardrails
 Read-only by default. Never claim a deterministic gate passed without running

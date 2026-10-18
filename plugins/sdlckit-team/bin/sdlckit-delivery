@@ -1,0 +1,1876 @@
+#!/usr/bin/env node
+"use strict";
+
+// src/cli.ts
+var import_node_fs3 = require("fs");
+var import_node_path2 = require("path");
+
+// src/delivery.ts
+var import_node_child_process = require("child_process");
+var import_node_fs2 = require("fs");
+var import_node_path = require("path");
+
+// ../eng/dist/index.js
+var import_child_process = require("child_process");
+var import_child_process2 = require("child_process");
+var import_fs = require("fs");
+var import_path = require("path");
+var MANIFEST_PATH = ".claude/engineering.json";
+var ManifestError = class extends Error {
+};
+function workTreeRoot(cwd) {
+  return git(["rev-parse", "--show-toplevel"], cwd);
+}
+function readManifest(root) {
+  const file = (0, import_path.join)(root, MANIFEST_PATH);
+  if (!(0, import_fs.existsSync)(file)) {
+    throw new ManifestError(`no manifest at ${file}. Run /eng-init first.`);
+  }
+  return JSON.parse((0, import_fs.readFileSync)(file, "utf8"));
+}
+function git(args, cwd) {
+  try {
+    return (0, import_child_process2.execFileSync)("git", args, {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"]
+    }).trim();
+  } catch {
+    throw new ManifestError(`not inside a git repository: ${cwd}`);
+  }
+}
+var DEFAULT_GATES = ["format", "lint", "typecheck", "test"];
+function runGates(cwd, gates = DEFAULT_GATES) {
+  const root = workTreeRoot(cwd);
+  const manifest = readManifest(root);
+  const results = [];
+  for (const gate of gates) {
+    const command = manifest.gates[gate] ?? null;
+    if (!command) {
+      results.push({
+        gate,
+        command: null,
+        status: "skip",
+        exitCode: null,
+        output: ""
+      });
+      continue;
+    }
+    const run2 = (0, import_child_process.spawnSync)("sh", ["-c", command], {
+      cwd: root,
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024
+    });
+    const output = `${run2.stdout ?? ""}${run2.stderr ?? ""}`;
+    results.push({
+      gate,
+      command,
+      status: run2.status === 0 ? "pass" : "fail",
+      exitCode: run2.status,
+      output
+    });
+  }
+  return { root, results, passed: results.every((r) => r.status !== "fail") };
+}
+function formatGates(run2) {
+  const lines = [`=== Deterministic gates (${run2.root}) ===`];
+  for (const r of run2.results) {
+    if (r.status === "skip") {
+      lines.push(`\u2022 ${r.gate.padEnd(12)} SKIP (not configured in manifest)`);
+      continue;
+    }
+    lines.push(
+      "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500",
+      `\u25B6 ${r.gate}: ${r.command}`
+    );
+    if (r.output.trim()) lines.push(r.output.trimEnd());
+    lines.push(
+      r.status === "pass" ? `\u2713 ${r.gate.padEnd(12)} PASS` : `\u2717 ${r.gate.padEnd(12)} FAIL (exit ${r.exitCode})`
+    );
+  }
+  lines.push(
+    "========================================",
+    run2.passed ? "GATES: PASS" : "GATES: FAIL"
+  );
+  return `${lines.join("\n")}
+`;
+}
+
+// src/errors.ts
+var DeliveryError = class extends Error {
+  code;
+  constructor(message, code = 1) {
+    super(message);
+    this.code = code;
+  }
+};
+
+// src/records.ts
+var import_node_fs = require("fs");
+function str(v) {
+  return typeof v === "string" ? v : v === null || v === void 0 ? "" : String(v);
+}
+function num(v) {
+  return typeof v === "number" ? v : 0;
+}
+function list(v) {
+  return Array.isArray(v) ? v.map((x) => str(x)) : [];
+}
+function map(v) {
+  return v && typeof v === "object" && !Array.isArray(v) ? v : {};
+}
+function parseScalar(raw) {
+  const s = raw.trim();
+  if (s === "" || s === "null" || s === "~") return null;
+  if (s === "true") return true;
+  if (s === "false") return false;
+  if (/^-?\d+(\.\d+)?$/.test(s)) return Number(s);
+  if (s.startsWith('"') && s.endsWith('"') || s.startsWith("'") && s.endsWith("'")) {
+    return s.slice(1, -1);
+  }
+  if (s.startsWith("[") && s.endsWith("]")) {
+    const inner = s.slice(1, -1).trim();
+    return inner ? splitTop(inner).map(parseScalar) : [];
+  }
+  if (s.startsWith("{") && s.endsWith("}")) {
+    const inner = s.slice(1, -1).trim();
+    const out = {};
+    if (inner) {
+      for (const part of splitTop(inner)) {
+        const i = part.indexOf(":");
+        out[part.slice(0, i).trim()] = parseScalar(part.slice(i + 1));
+      }
+    }
+    return out;
+  }
+  return s;
+}
+function splitTop(s) {
+  const out = [];
+  let depth = 0;
+  let cur = "";
+  let quote = null;
+  for (const ch of s) {
+    if (quote) {
+      cur += ch;
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      cur += ch;
+      continue;
+    }
+    if (ch === "[" || ch === "{") depth++;
+    if (ch === "]" || ch === "}") depth--;
+    if (ch === "," && depth === 0) {
+      out.push(cur);
+      cur = "";
+    } else cur += ch;
+  }
+  if (cur.trim()) out.push(cur);
+  return out;
+}
+function formatScalar(v) {
+  if (v === null || v === void 0) return "null";
+  if (Array.isArray(v)) return `[${v.map(formatScalar).join(", ")}]`;
+  if (typeof v === "object") {
+    return `{${Object.entries(v).map(([k, x]) => `${k}: ${formatScalar(x)}`).join(", ")}}`;
+  }
+  if (typeof v === "string" && (/[:#,[\]{}]/.test(v) || /^\s|\s$/.test(v) || v === "")) {
+    return JSON.stringify(v);
+  }
+  return String(v);
+}
+function readRec(file) {
+  const txt = (0, import_node_fs.readFileSync)(file, "utf8");
+  const m = txt.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+  if (!m) throw new DeliveryError(`no frontmatter in ${file}`);
+  const fm = {};
+  for (const line of (m[1] ?? "").split("\n")) {
+    if (!line.trim()) continue;
+    const i = line.indexOf(":");
+    fm[line.slice(0, i).trim()] = parseScalar(line.slice(i + 1));
+  }
+  return { file, fm, body: m[2] ?? "" };
+}
+function writeRec(rec) {
+  if (rec.docStyle) {
+    (0, import_node_fs.writeFileSync)(
+      rec.file,
+      rec.body.replace(
+        /^(- \*\*Status:\*\*\s*)\S+/m,
+        `$1${str(rec.fm.status)}`
+      )
+    );
+    return;
+  }
+  const head = Object.entries(rec.fm).map(([k, v]) => `${k}: ${formatScalar(v)}`).join("\n");
+  (0, import_node_fs.writeFileSync)(rec.file, `---
+${head}
+---
+${rec.body}`);
+}
+function section(body, name) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const m = body.match(
+    new RegExp(`^## ${escaped}\\s*\\n([\\s\\S]*?)(?=^## |(?![\\s\\S]))`, "m")
+  );
+  return m ? m[1] ?? "" : null;
+}
+function meaningful(text) {
+  return (text ?? "").replace(/<!--[\s\S]*?-->/g, "").replace(/^\s*-\s*(AC\d+:|\[ \] TAC\d+:)?\s*$/gm, "").trim().length > 0;
+}
+function today() {
+  return (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+}
+function appendHistory(rec, line) {
+  const entry = `- ${today()} ${line}`;
+  rec.body = /^## History\s*$/m.test(rec.body) ? rec.body.replace(/\s*$/, `
+${entry}
+`) : `${rec.body.trimEnd()}
+
+## History
+${entry}
+`;
+}
+function slug(title) {
+  return title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 48);
+}
+
+// src/delivery.ts
+var EPIC_T = {
+  draft: ["proposed"],
+  proposed: ["draft"],
+  approved: ["planned"],
+  planned: ["approved"],
+  "in-delivery": ["in-acceptance"],
+  "in-acceptance": ["in-delivery"]
+};
+var TICKET_T = {
+  todo: ["in-design", "ready"],
+  "in-design": ["design-approved"],
+  "design-approved": ["ready", "in-design"],
+  ready: ["in-progress"],
+  "in-progress": ["in-qa"],
+  "in-qa": ["rework", "qa-passed"],
+  rework: ["in-qa"],
+  "qa-passed": ["done", "in-qa"]
+};
+var GATES = {
+  intake: ["proposed", "approved"],
+  plan: ["planned", "in-delivery"],
+  acceptance: ["in-acceptance", "done"]
+};
+var LOCKED_FIELDS = [
+  "id",
+  "status",
+  "gates",
+  "qa_round",
+  "red_gate_runs",
+  "blocked_from",
+  "model_overrides",
+  "epic"
+];
+var ARTIFACTS = {
+  design: "design.md",
+  "design-review": "review.md",
+  "qa-plan": "plan.md",
+  "qa-report": "report.md",
+  "gates-log": "gates.log",
+  review: "review.md"
+};
+var ARTIFACT_TEMPLATES = {
+  design: "design.md",
+  "design-review": "design-review.md",
+  "qa-plan": "qa-plan.md",
+  "qa-report": "qa-report.md"
+};
+var Delivery = class {
+  constructor(cwd, home, out = (line) => process.stdout.write(`${line}
+`), err = (line) => process.stderr.write(`${line}
+`)) {
+    this.cwd = cwd;
+    this.home = home;
+    this.out = out;
+    this.err = err;
+    const common = this.git(
+      ["rev-parse", "--path-format=absolute", "--git-common-dir"],
+      cwd,
+      true
+    );
+    if (!common) throw new DeliveryError("not inside a git repository");
+    this.root = (0, import_node_path.dirname)(common);
+    this.manifestPath = (0, import_node_path.join)(this.root, ".claude", "engineering.json");
+  }
+  cwd;
+  home;
+  out;
+  err;
+  root;
+  manifestPath;
+  configCache;
+  // ───────────── config and paths ─────────────
+  manifest() {
+    if (!(0, import_node_fs2.existsSync)(this.manifestPath)) {
+      throw new DeliveryError(
+        `no manifest at ${this.manifestPath}. Run /eng-init first.`,
+        3
+      );
+    }
+    return JSON.parse((0, import_node_fs2.readFileSync)(this.manifestPath, "utf8"));
+  }
+  config() {
+    if (this.configCache) return this.configCache;
+    const d = this.manifest().delivery ?? {};
+    this.configCache = {
+      dir: d.dir ?? ".delivery",
+      budget: d.budget ?? "balanced",
+      maxParallelEngineers: d.maxParallelEngineers ?? 2,
+      qaReworkCap: d.qaReworkCap ?? 3,
+      baseBranch: d.baseBranch ?? "main",
+      gates: d.gates ?? ["format", "lint", "typecheck", "test"],
+      worktreeSetup: d.worktreeSetup ?? null,
+      worktreeCopy: d.worktreeCopy ?? [],
+      engineers: d.engineers ?? {},
+      docs: d.docs ?? {}
+    };
+    return this.configCache;
+  }
+  routing() {
+    return JSON.parse(
+      (0, import_node_fs2.readFileSync)((0, import_node_path.join)(this.home, "routing.json"), "utf8")
+    );
+  }
+  mainDir() {
+    return (0, import_node_path.join)(this.root, this.config().dir);
+  }
+  wtRoot() {
+    return (0, import_node_path.join)(this.mainDir(), ".worktrees");
+  }
+  epicWt(eid) {
+    return (0, import_node_path.join)(this.wtRoot(), eid);
+  }
+  ticketWt(tid) {
+    return (0, import_node_path.join)(this.wtRoot(), tid);
+  }
+  git(args, cwd = this.root, soft = false) {
+    try {
+      return (0, import_node_child_process.execFileSync)("git", args, {
+        cwd,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"]
+      }).trim();
+    } catch (cause) {
+      if (soft) return null;
+      const stderr = cause.stderr ?? String(cause);
+      throw new DeliveryError(`git ${args.join(" ")} failed:
+${stderr}`);
+    }
+  }
+  gitOk(args, cwd = this.root) {
+    return this.git(args, cwd, true) !== null;
+  }
+  template(name, vars) {
+    let t = (0, import_node_fs2.readFileSync)((0, import_node_path.join)(this.home, "templates", name), "utf8");
+    for (const [k, v] of Object.entries(vars)) t = t.split(`{{${k}}}`).join(v);
+    return t;
+  }
+  // ───────────── record discovery ─────────────
+  epicWorktrees() {
+    if (!(0, import_node_fs2.existsSync)(this.wtRoot())) return [];
+    return (0, import_node_fs2.readdirSync)(this.wtRoot()).filter((d) => /^E-\d+$/.test(d));
+  }
+  recordDirs() {
+    return [
+      this.mainDir(),
+      ...this.epicWorktrees().map(
+        (d) => (0, import_node_path.join)(this.epicWt(d), this.config().dir)
+      )
+    ].filter((d) => (0, import_node_fs2.existsSync)(d));
+  }
+  /** One file per id; an epic worktree copy beats a copy committed on the base branch. */
+  allRecs(kind) {
+    const byId = /* @__PURE__ */ new Map();
+    const marker = `${import_node_path.sep}.worktrees${import_node_path.sep}`;
+    for (const d of this.recordDirs()) {
+      const k = (0, import_node_path.join)(d, kind);
+      if (!(0, import_node_fs2.existsSync)(k)) continue;
+      for (const f of (0, import_node_fs2.readdirSync)(k)) {
+        if (!f.endsWith(".md")) continue;
+        const id = f.match(/^((?:E|T|ADR)-\d+)/)?.[1] ?? f;
+        const file = (0, import_node_path.join)(k, f);
+        if (!byId.has(id) || file.includes(marker)) byId.set(id, file);
+      }
+    }
+    return [...byId.values()];
+  }
+  adrDirMode() {
+    return Boolean(this.config().docs.adrDir);
+  }
+  docAdrs() {
+    const rel = this.config().docs.adrDir ?? "";
+    const dirs = [
+      (0, import_node_path.join)(this.root, rel),
+      ...this.epicWorktrees().map((d) => (0, import_node_path.join)(this.epicWt(d), rel))
+    ].filter((d) => (0, import_node_fs2.existsSync)(d));
+    const found = /* @__PURE__ */ new Map();
+    for (const d of dirs) {
+      for (const f of (0, import_node_fs2.readdirSync)(d)) {
+        const n = f.match(/^(\d{4})-.+\.md$/)?.[1];
+        if (!n) continue;
+        const file = (0, import_node_path.join)(d, f);
+        if (!found.has(`ADR-${n}`) || file.includes(`${import_node_path.sep}.worktrees${import_node_path.sep}`))
+          found.set(`ADR-${n}`, file);
+      }
+    }
+    return found;
+  }
+  findRec(id) {
+    if (id.startsWith("ADR-") && this.adrDirMode()) {
+      const file = this.docAdrs().get(id);
+      if (!file) throw new DeliveryError(`record ${id} not found`);
+      const body = (0, import_node_fs2.readFileSync)(file, "utf8");
+      const status = (body.match(/^- \*\*Status:\*\*\s*(\S+)/m)?.[1] ?? "proposed").replace(/[^a-z-]/gi, "");
+      const epic = body.match(/^- \*\*Epic:\*\*\s*(E-\d+)/m)?.[1] ?? null;
+      return { file, fm: { id, status, epic }, body, docStyle: true };
+    }
+    const kind = id.startsWith("E-") ? "epics" : id.startsWith("T-") ? "tickets" : id.startsWith("ADR-") ? "adr" : null;
+    if (!kind) throw new DeliveryError(`bad id ${id}`);
+    const hits = this.allRecs(kind).filter(
+      (f) => (0, import_node_path.basename)(f).startsWith(`${id}-`) || (0, import_node_path.basename)(f) === `${id}.md`
+    );
+    const marker = `${import_node_path.sep}.worktrees${import_node_path.sep}`;
+    hits.sort(
+      (a, b) => Number(b.includes(marker)) - Number(a.includes(marker))
+    );
+    const hit = hits[0];
+    if (!hit) throw new DeliveryError(`record ${id} not found`);
+    return readRec(hit);
+  }
+  recDir(rec) {
+    return (0, import_node_path.dirname)((0, import_node_path.dirname)(rec.file));
+  }
+  nextId(prefix, kind) {
+    let max = 0;
+    for (const f of this.allRecs(kind)) {
+      const m = (0, import_node_path.basename)(f).match(new RegExp(`^${prefix}-(\\d+)`));
+      if (m) max = Math.max(max, Number(m[1]));
+    }
+    return `${prefix}-${String(max + 1).padStart(3, "0")}`;
+  }
+  epicTickets(eid) {
+    return this.allRecs("tickets").map(readRec).filter((r) => r.fm.epic === eid);
+  }
+  isCut(eid) {
+    return (0, import_node_fs2.existsSync)((0, import_node_path.join)(this.epicWt(eid), this.config().dir));
+  }
+  epicOf(rec) {
+    const id = str(rec.fm.id);
+    return id.startsWith("E-") ? id : str(rec.fm.epic);
+  }
+  /** Commits record changes in an epic worktree, only at checkpoints, so the epic PR history stays readable. */
+  commitRecords(eid, msg, checkpoint = false) {
+    if (!checkpoint || !this.isCut(eid)) return;
+    const wt = this.epicWt(eid);
+    const dir = this.config().dir;
+    this.git(["add", "-A", "--", dir, `:(exclude)${dir}/qa/*/evidence/**`], wt);
+    if (this.git(["diff", "--cached", "--name-only"], wt)) {
+      this.git(["commit", "-q", "-m", `chore(delivery): ${msg}`], wt);
+    }
+  }
+  // ───────────── checks ─────────────
+  tacs(rec) {
+    const ac = section(rec.body, "Acceptance criteria") ?? "";
+    return [...ac.matchAll(/^- \[( |x|X)\] (TAC\d+):?(.*)$/gm)].map((m) => ({
+      id: m[2] ?? "",
+      done: m[1] !== " ",
+      text: (m[3] ?? "").trim()
+    }));
+  }
+  dor(t) {
+    const errs = [];
+    const domains = this.manifest().domains ?? {};
+    const domain = str(t.fm.domain);
+    if (!domain || !domains[domain]?.present)
+      errs.push(`domain '${domain}' not present in manifest`);
+    const tacs = this.tacs(t);
+    if (!tacs.length || tacs.some((x) => !x.text))
+      errs.push("needs \u22651 TAC, each with text");
+    if (!list(t.fm.traces).length) errs.push("traces must list \u22651 epic AC");
+    for (const d of list(t.fm.depends_on)) {
+      try {
+        this.findRec(d);
+      } catch {
+        errs.push(`dependency ${d} missing`);
+      }
+    }
+    if (typeof t.fm.ui !== "boolean") errs.push("ui must be true|false");
+    if (!str(t.fm.owner) || t.fm.owner === "unassigned") {
+      errs.push(
+        `no engineer for domain '${domain}' (add delivery.engineers.${domain} to the manifest)`
+      );
+    }
+    if (!["small", "normal", "high"].includes(str(t.fm.risk)))
+      errs.push("risk must be small|normal|high");
+    if (!meaningful(section(t.body, "Technical approach")))
+      errs.push("Technical approach is empty");
+    return errs;
+  }
+  artifact(t, kind) {
+    const folder = kind === "design" || kind === "design-review" ? "designs" : "qa";
+    return (0, import_node_path.join)(this.recDir(t), folder, str(t.fm.id), ARTIFACTS[kind] ?? kind);
+  }
+  ticketHead(t) {
+    return this.git(["rev-parse", `ticket/${str(t.fm.id)}`], this.root, true);
+  }
+  docsOnlySince(head, cur) {
+    if (!head || !cur) return false;
+    if (head === cur) return true;
+    if (!this.gitOk(["merge-base", "--is-ancestor", head, cur])) return false;
+    return (this.git(["diff", "--name-only", head, cur]) ?? "").split("\n").filter(Boolean).every((p) => /\.(md|mdx|txt)$/i.test(p) || p.startsWith("docs/"));
+  }
+  gatesOk(t, allowDocsAfter = false) {
+    const f = this.artifact(t, "gates-log");
+    if (!(0, import_node_fs2.existsSync)(f))
+      return `no gates log (run: sdlckit-delivery gates ${str(t.fm.id)})`;
+    const log = (0, import_node_fs2.readFileSync)(f, "utf8");
+    const head = log.match(/^HEAD: (\w+)/m)?.[1] ?? null;
+    if (!/^RESULT: PASS$/m.test(log)) return "last gates run FAILED";
+    const cur = this.ticketHead(t);
+    if (!cur) return "ticket branch missing";
+    if (head === cur || allowDocsAfter && this.docsOnlySince(head, cur))
+      return null;
+    return `gates log is for ${head?.slice(0, 8)}, branch is at ${cur.slice(0, 8)}: rerun gates`;
+  }
+  qaCurrent(t, allowDocsAfter = false) {
+    const q = this.lastQaRound(t);
+    if (!q) return "no QA round recorded";
+    const cur = this.ticketHead(t);
+    if (q.head === cur || allowDocsAfter && this.docsOnlySince(q.head, cur))
+      return null;
+    return `last QA round tested ${q.head ? q.head.slice(0, 8) : "(no HEAD)"}, branch is at ${cur?.slice(0, 8)}: QA must re-test`;
+  }
+  qaLockPath(t) {
+    return (0, import_node_path.join)(this.recDir(t), "qa", str(t.fm.id), "tests.lock");
+  }
+  qaTestsIntact(t) {
+    const f = this.qaLockPath(t);
+    if (!(0, import_node_fs2.existsSync)(f)) return null;
+    const head = this.ticketHead(t);
+    for (const line of (0, import_node_fs2.readFileSync)(f, "utf8").split("\n").filter(Boolean)) {
+      const hash = line.slice(0, line.indexOf(" "));
+      const file = line.slice(line.indexOf(" ") + 1);
+      if (this.git(["rev-parse", `${head}:${file}`], this.root, true) !== hash) {
+        return `QA test ${file} was changed or removed after QA locked it: only qa-specialist may change it (then re-run qa-lock)`;
+      }
+    }
+    return null;
+  }
+  reviewOk(t) {
+    const f = this.artifact(t, "review");
+    if (!(0, import_node_fs2.existsSync)(f))
+      return `no review record (run: sdlckit-delivery review ${str(t.fm.id)} --blockers N --majors N)`;
+    const r = (0, import_node_fs2.readFileSync)(f, "utf8");
+    if (r.match(/^HEAD: (\w+)/m)?.[1] !== this.ticketHead(t))
+      return "review record is for an older commit: re-review";
+    if (!/^OPEN_BLOCKERS: 0$/m.test(r) || !/^OPEN_MAJORS: 0$/m.test(r))
+      return "open blocker/major findings remain";
+    return null;
+  }
+  lastQaRound(t) {
+    const f = this.artifact(t, "qa-report");
+    if (!(0, import_node_fs2.existsSync)(f)) return null;
+    const parts = (0, import_node_fs2.readFileSync)(f, "utf8").split(/^## Round /m);
+    if (parts.length < 2) return null;
+    const last = parts[parts.length - 1] ?? "";
+    return {
+      head: last.match(/^HEAD: (\w+)/m)?.[1] ?? null,
+      verdict: last.match(/^VERDICT: (PASS|FAIL)$/m)?.[1] ?? null,
+      tac: Object.fromEntries(
+        [...last.matchAll(/^(TAC\d+): (PASS|FAIL)/gm)].map((m) => [
+          m[1] ?? "",
+          m[2] ?? ""
+        ])
+      )
+    };
+  }
+  designApproved(t) {
+    const design = this.artifact(t, "design");
+    const review = this.artifact(t, "design-review");
+    if (!(0, import_node_fs2.existsSync)(design)) return "design.md missing";
+    if (!(0, import_node_fs2.existsSync)(review)) return "design review missing";
+    const componentMap = section((0, import_node_fs2.readFileSync)(design, "utf8"), "Component map") ?? "";
+    const rows = componentMap.split("\n").filter(
+      (l) => /^\|/.test(l) && !/^\|\s*(Region|-)/.test(l) && l.replace(/[|\s]/g, "")
+    );
+    if (rows.length === 0) return "design.md Component map has no rows";
+    const r = (0, import_node_fs2.readFileSync)(review, "utf8");
+    if (!/^VERDICT: approved$/m.test(section(r, "product-owner") ?? ""))
+      return "product-owner has not approved the design";
+    if (!/^VERDICT: approved$/m.test(section(r, "tech-lead") ?? ""))
+      return "tech-lead has not approved the design";
+    return null;
+  }
+  merged(t) {
+    const h = this.ticketHead(t);
+    return Boolean(h) && this.gitOk([
+      "merge-base",
+      "--is-ancestor",
+      h ?? "",
+      `epic/${str(t.fm.epic)}`
+    ]);
+  }
+  dod(t) {
+    const errs = [];
+    for (const x of this.tacs(t)) {
+      if (!x.done) errs.push(`${x.id} not checked`);
+      else if (!/\(evidence:\s*[^)]+\)/.test(x.text))
+        errs.push(`${x.id} has no (evidence: \u2026)`);
+    }
+    if (this.lastQaRound(t)?.verdict !== "PASS")
+      errs.push("last QA round is not VERDICT: PASS");
+    const qa = this.qaCurrent(t, true);
+    if (qa) errs.push(`qa: ${qa}`);
+    const gates = this.gatesOk(t, true);
+    if (gates) errs.push(`gates: ${gates}`);
+    const review = this.artifact(t, "review");
+    if (!(0, import_node_fs2.existsSync)(review)) errs.push("no review record");
+    else {
+      const r = (0, import_node_fs2.readFileSync)(review, "utf8");
+      if (!/^OPEN_BLOCKERS: 0$/m.test(r) || !/^OPEN_MAJORS: 0$/m.test(r))
+        errs.push("open blocker/major findings");
+    }
+    if (!meaningful(section(t.body, "Docs")))
+      errs.push(
+        'Docs section empty (write updates or "No docs impact: <reason>")'
+      );
+    const epic = this.findRec(str(t.fm.epic));
+    if (!(section(epic.body, "Changelog") ?? "").includes(str(t.fm.id))) {
+      errs.push(`no Changelog entry for ${str(t.fm.id)} in ${str(t.fm.epic)}`);
+    }
+    if (!this.merged(t))
+      errs.push(
+        `ticket/${str(t.fm.id)} not merged into epic/${str(t.fm.epic)}`
+      );
+    return errs;
+  }
+  /**
+   * Contract drift: error codes and HTTP routes named in the epic Architecture vs in its tickets.
+   * Ticket-only codes count only when tied to an HTTP status (client-internal codes are not contract);
+   * routes compare by shape, and an Architecture param segment (:id, {id}, <id>) matches any value.
+   */
+  drift(eid) {
+    const e = this.findRec(eid);
+    const arch = contractTokens(section(e.body, "Architecture"));
+    const tickets = this.epicTickets(eid).filter(
+      (t) => t.fm.status !== "cancelled"
+    );
+    const tk = contractTokens(tickets.map((t) => t.body).join("\n"));
+    const archOnly = [
+      ...[...arch.codes].filter((c) => !tk.codes.has(c)),
+      ...[...arch.routes].filter(
+        (r) => ![...tk.routes].some((x) => routeMatch(r, x))
+      )
+    ];
+    const tkOnly = [
+      ...[...tk.statusCodes].filter((c) => !arch.codes.has(c)),
+      ...[...tk.routes].filter(
+        (x) => ![...arch.routes].some((r) => routeMatch(r, x))
+      )
+    ];
+    return {
+      inArchitectureOnly: archOnly.sort(),
+      inTicketsOnly: tkOnly.sort(),
+      checked: { codes: arch.codes.size, routes: arch.routes.size }
+    };
+  }
+  inFlight() {
+    return this.allRecs("tickets").map(readRec).filter((r) => ["in-progress", "rework"].includes(str(r.fm.status)));
+  }
+  // ───────────── transitions ─────────────
+  checkEpic(e, to) {
+    const errs = [];
+    const eid = str(e.fm.id);
+    if (to === "proposed") {
+      if (!meaningful(section(e.body, "Problem / WHY")))
+        errs.push("Problem / WHY empty");
+      if (!/^- AC\d+:\s*\S/m.test(section(e.body, "Acceptance criteria") ?? ""))
+        errs.push("needs \u22651 AC with text");
+    }
+    if (to === "planned") {
+      if (!this.isCut(eid)) errs.push("epic not cut (sdlckit-delivery cut)");
+      const tickets = this.epicTickets(eid).filter(
+        (t) => t.fm.status !== "cancelled"
+      );
+      if (!tickets.length) errs.push("no tickets");
+      for (const t of tickets) {
+        const d2 = this.dor(t);
+        if (d2.length) errs.push(`${str(t.fm.id)} fails DoR: ${d2.join("; ")}`);
+      }
+      const acs = [
+        ...(section(e.body, "Acceptance criteria") ?? "").matchAll(
+          /^- (AC\d+):/gm
+        )
+      ].map((m) => m[1] ?? "");
+      const traced = new Set(tickets.flatMap((t) => list(t.fm.traces)));
+      for (const a of acs)
+        if (!traced.has(a)) errs.push(`${a} is not traced by any ticket`);
+      const d = this.drift(eid);
+      if (d.inArchitectureOnly.length)
+        errs.push(
+          `contract in Architecture but in no ticket: ${d.inArchitectureOnly.join(", ")}`
+        );
+      if (d.inTicketsOnly.length)
+        errs.push(
+          `contract in tickets but not in Architecture: ${d.inTicketsOnly.join(", ")}`
+        );
+    }
+    if (to === "in-acceptance") {
+      for (const t of this.epicTickets(eid)) {
+        if (!["done", "cancelled"].includes(str(t.fm.status)))
+          errs.push(`${str(t.fm.id)} is ${str(t.fm.status)}`);
+      }
+      const report = (0, import_node_path.join)(this.recDir(e), "reports", `${eid}.md`);
+      if (!(0, import_node_fs2.existsSync)(report) || !meaningful(section((0, import_node_fs2.readFileSync)(report, "utf8"), "What was delivered"))) {
+        errs.push("epic report missing or empty");
+      }
+    }
+    return errs;
+  }
+  checkTicket(t, to) {
+    const errs = [];
+    const push = (x) => {
+      if (x) errs.push(x);
+    };
+    if (to === "in-design" && !t.fm.ui)
+      errs.push("ui:false tickets skip design");
+    if (to === "ready") {
+      if (t.fm.ui && t.fm.status !== "design-approved")
+        errs.push("ui ticket needs design-approved first");
+      errs.push(...this.dor(t));
+    }
+    if (to === "design-approved") push(this.designApproved(t));
+    if (to === "in-progress") {
+      const e = this.findRec(str(t.fm.epic));
+      if (e.fm.status !== "in-delivery")
+        errs.push(`epic is ${str(e.fm.status)}, not in-delivery`);
+      for (const d of list(t.fm.depends_on)) {
+        const r = this.findRec(d);
+        if (r.fm.status !== "done")
+          errs.push(`dependency ${d} is ${str(r.fm.status)}`);
+      }
+      const plan = this.artifact(t, "qa-plan");
+      if (!(0, import_node_fs2.existsSync)(plan) || !/\|\s*TAC\d+\s*\|/.test((0, import_node_fs2.readFileSync)(plan, "utf8"))) {
+        errs.push("QA test plan missing (QA writes it at ready, before code)");
+      }
+      const max = this.config().maxParallelEngineers;
+      if (this.inFlight().length >= max)
+        errs.push(`engineer slots full (${max})`);
+      if (!(0, import_node_fs2.existsSync)(this.ticketWt(str(t.fm.id))))
+        errs.push(`no worktree (sdlckit-delivery worktree ${str(t.fm.id)})`);
+    }
+    if (to === "in-qa") {
+      push(this.gatesOk(t));
+      push(this.reviewOk(t));
+      push(this.qaTestsIntact(t));
+    }
+    if (to === "rework") {
+      if (this.lastQaRound(t)?.verdict !== "FAIL")
+        errs.push("last QA round is not VERDICT: FAIL");
+      const cap = this.config().qaReworkCap;
+      if (num(t.fm.qa_round) >= cap) {
+        errs.push(
+          `rework cap ${cap} reached: transition to blocked (unblock-owner tech-lead)`
+        );
+      }
+    }
+    if (to === "qa-passed") {
+      const q = this.lastQaRound(t);
+      if (q?.verdict !== "PASS")
+        errs.push("last QA round is not VERDICT: PASS");
+      else
+        for (const x of this.tacs(t))
+          if (q.tac[x.id] !== "PASS")
+            errs.push(`${x.id} not PASS in last QA round`);
+      push(this.gatesOk(t));
+      push(this.qaCurrent(t));
+      push(this.qaTestsIntact(t));
+    }
+    if (to === "done") errs.push(...this.dod(t));
+    return errs;
+  }
+  transition(id, to, opts) {
+    const rec = this.findRec(id);
+    const from = str(rec.fm.status);
+    const isEpic = id.startsWith("E-");
+    const reason = typeof opts.reason === "string" ? opts.reason : "";
+    if (to === "blocked") {
+      const owner = opts["unblock-owner"];
+      if (!reason || typeof owner !== "string")
+        throw new DeliveryError("blocked needs --reason and --unblock-owner");
+      rec.fm.blocked_from = from;
+      rec.fm.blocked_reason = reason;
+      rec.fm.unblock_owner = owner;
+    } else if (to === "cancelled") {
+      if (!reason) throw new DeliveryError("cancelled needs --reason");
+    } else if (from === "blocked") {
+      if (to !== rec.fm.blocked_from) {
+        throw new DeliveryError(
+          `blocked ${id} can only return to ${str(rec.fm.blocked_from)}`
+        );
+      }
+      delete rec.fm.blocked_from;
+      delete rec.fm.blocked_reason;
+      delete rec.fm.unblock_owner;
+    } else {
+      const allowed = (isEpic ? EPIC_T : TICKET_T)[from] ?? [];
+      if (!allowed.includes(to)) {
+        throw new DeliveryError(
+          `illegal transition ${id}: ${from} \u2192 ${to} (allowed: ${allowed.join(", ") || "none"}${isEpic ? "; gated moves use `gate`" : ""})`
+        );
+      }
+      const errs = isEpic ? this.checkEpic(rec, to) : this.checkTicket(rec, to);
+      if (errs.length)
+        throw new DeliveryError(
+          `cannot move ${id} ${from} \u2192 ${to}:
+  - ${errs.join("\n  - ")}`,
+          2
+        );
+    }
+    if (to === "in-qa" && !isEpic) rec.fm.qa_round = num(rec.fm.qa_round) + 1;
+    rec.fm.status = to;
+    appendHistory(rec, `${from} \u2192 ${to}${reason ? ` (${reason})` : ""}`);
+    writeRec(rec);
+    this.commitRecords(
+      this.epicOf(rec),
+      `${id} ${from} \u2192 ${to}`,
+      to === "done" || isEpic && to === "in-acceptance"
+    );
+    this.out(`${id}: ${from} \u2192 ${to}`);
+  }
+  gate(eid, which) {
+    const e = this.findRec(eid);
+    const pair = GATES[which];
+    if (!pair) throw new DeliveryError("gate must be intake|plan|acceptance");
+    const [needs, becomes] = pair;
+    if (e.fm.status !== needs)
+      throw new DeliveryError(
+        `${eid} is ${str(e.fm.status)}; ${which} gate needs ${needs}`,
+        2
+      );
+    e.fm.gates = { ...map(e.fm.gates), [which]: today() };
+    const from = str(e.fm.status);
+    e.fm.status = becomes;
+    appendHistory(e, `${which} gate approved by PO \u2192 ${becomes}`);
+    writeRec(e);
+    this.commitRecords(eid, `${eid} ${which} gate \u2192 ${becomes}`, true);
+    this.out(`${eid}: ${from} \u2192 ${becomes} (${which} gate)`);
+  }
+  // ───────────── git workflow ─────────────
+  setupWorktree(wt) {
+    const rel = (0, import_node_path.relative)(this.root, this.manifestPath);
+    if (!(0, import_node_fs2.existsSync)((0, import_node_path.join)(wt, rel))) {
+      (0, import_node_fs2.mkdirSync)((0, import_node_path.dirname)((0, import_node_path.join)(wt, rel)), { recursive: true });
+      (0, import_node_fs2.copyFileSync)(this.manifestPath, (0, import_node_path.join)(wt, rel));
+    }
+    for (const f of this.config().worktreeCopy) {
+      const src = (0, import_node_path.join)(this.root, f);
+      const dst = (0, import_node_path.join)(wt, f);
+      if ((0, import_node_fs2.existsSync)(src) && !(0, import_node_fs2.existsSync)(dst)) {
+        (0, import_node_fs2.mkdirSync)((0, import_node_path.dirname)(dst), { recursive: true });
+        (0, import_node_fs2.copyFileSync)(src, dst);
+      }
+    }
+    const setup = this.config().worktreeSetup;
+    if (setup) {
+      const r = (0, import_node_child_process.spawnSync)("sh", ["-c", setup], { cwd: wt, stdio: "inherit" });
+      if (r.status !== 0)
+        throw new DeliveryError(`worktreeSetup failed in ${wt}`);
+    }
+  }
+  cut(eid) {
+    const e = this.findRec(eid);
+    if (this.isCut(eid)) {
+      this.out(this.epicWt(eid));
+      return;
+    }
+    if (!["approved", "planned"].includes(str(e.fm.status))) {
+      throw new DeliveryError(
+        `${eid} is ${str(e.fm.status)}; cut after intake approval`,
+        2
+      );
+    }
+    const br = `epic/${eid}`;
+    if (!this.gitOk(["rev-parse", "--verify", "--quiet", br]))
+      this.git(["branch", br, this.config().baseBranch]);
+    (0, import_node_fs2.mkdirSync)(this.wtRoot(), { recursive: true });
+    this.git(["worktree", "add", "-q", this.epicWt(eid), br]);
+    const dst = (0, import_node_path.join)(this.epicWt(eid), this.config().dir, "epics");
+    (0, import_node_fs2.mkdirSync)(dst, { recursive: true });
+    const tracked = this.gitOk(["ls-files", "--error-unmatch", e.file]);
+    (0, import_node_fs2.copyFileSync)(e.file, (0, import_node_path.join)(dst, (0, import_node_path.basename)(e.file)));
+    if (tracked) {
+      this.err(
+        `note: ${(0, import_node_path.relative)(this.root, e.file)} is committed on your branch; the live copy is now on ${br} and comes back through the epic PR. Leave your copy as is.`
+      );
+    } else (0, import_node_fs2.unlinkSync)(e.file);
+    for (const d of ["tickets", "designs", "qa", "adr", "reports"]) {
+      (0, import_node_fs2.mkdirSync)((0, import_node_path.join)(this.epicWt(eid), this.config().dir, d), {
+        recursive: true
+      });
+    }
+    this.setupWorktree(this.epicWt(eid));
+    this.commitRecords(eid, `${eid} cut epic branch`, true);
+    this.out(this.epicWt(eid));
+  }
+  worktree(tid) {
+    const t = this.findRec(tid);
+    const wt = this.ticketWt(tid);
+    if ((0, import_node_fs2.existsSync)(wt)) {
+      this.out(wt);
+      return;
+    }
+    const epic = str(t.fm.epic);
+    if (!this.isCut(epic)) throw new DeliveryError(`epic ${epic} not cut`);
+    const br = `ticket/${tid}`;
+    if (!this.gitOk(["rev-parse", "--verify", "--quiet", br]))
+      this.git(["branch", br, `epic/${epic}`]);
+    this.git(["worktree", "add", "-q", wt, br]);
+    this.setupWorktree(wt);
+    this.out(wt);
+  }
+  /** Runs the manifest gates in the ticket worktree and records the result against its HEAD. */
+  gates(tid, names) {
+    const t = this.findRec(tid);
+    const wt = this.ticketWt(tid);
+    if (!(0, import_node_fs2.existsSync)(wt)) throw new DeliveryError(`no worktree for ${tid}`);
+    const gates = names.length ? names : this.config().gates;
+    const run2 = runGates(wt, gates);
+    const report = formatGates(run2);
+    const head = this.git(["rev-parse", "HEAD"], wt) ?? "";
+    const f = this.artifact(t, "gates-log");
+    (0, import_node_fs2.mkdirSync)((0, import_node_path.dirname)(f), { recursive: true });
+    (0, import_node_fs2.writeFileSync)(
+      f,
+      `HEAD: ${head}
+DATE: ${(/* @__PURE__ */ new Date()).toISOString()}
+GATES: ${gates.join(" ")}
+RESULT: ${run2.passed ? "PASS" : "FAIL"}
+
+${report}`
+    );
+    t.fm.red_gate_runs = run2.passed ? 0 : num(t.fm.red_gate_runs) + 1;
+    writeRec(t);
+    this.out(report.slice(-6e3).trimEnd());
+    this.out(
+      `
+${tid} gates: ${run2.passed ? "PASS" : "FAIL"} @ ${head.slice(0, 8)} (log: ${f})`
+    );
+    return run2.passed;
+  }
+  review(tid, opts) {
+    const t = this.findRec(tid);
+    const head = this.ticketHead(t);
+    if (!head) throw new DeliveryError("no ticket branch");
+    const b = Number(opts.blockers);
+    const m = Number(opts.majors);
+    if (!Number.isInteger(b) || !Number.isInteger(m))
+      throw new DeliveryError("--blockers and --majors are required integers");
+    const f = this.artifact(t, "review");
+    (0, import_node_fs2.mkdirSync)((0, import_node_path.dirname)(f), { recursive: true });
+    const reviewers = typeof opts.reviewers === "string" ? opts.reviewers : "unspecified";
+    (0, import_node_fs2.writeFileSync)(
+      f,
+      `HEAD: ${head}
+DATE: ${(/* @__PURE__ */ new Date()).toISOString()}
+REVIEWERS: ${reviewers}
+OPEN_BLOCKERS: ${b}
+OPEN_MAJORS: ${m}
+`
+    );
+    this.out(
+      `${tid} review recorded @ ${head.slice(0, 8)}: blockers=${b} majors=${m}`
+    );
+  }
+  qaRound(tid) {
+    const t = this.findRec(tid);
+    if (t.fm.status !== "in-qa")
+      throw new DeliveryError(
+        `${tid} is ${str(t.fm.status)}; QA rounds happen in in-qa`,
+        2
+      );
+    const head = this.ticketHead(t);
+    const f = this.artifact(t, "qa-report");
+    if (!(0, import_node_fs2.existsSync)(f)) {
+      (0, import_node_fs2.mkdirSync)((0, import_node_path.dirname)(f), { recursive: true });
+      (0, import_node_fs2.writeFileSync)(
+        f,
+        this.template("qa-report.md", { id: tid, title: str(t.fm.title) })
+      );
+    }
+    const n = num(t.fm.qa_round) || 1;
+    if (new RegExp(`^## Round ${n}\\b`, "m").test((0, import_node_fs2.readFileSync)(f, "utf8"))) {
+      this.out(f);
+      return;
+    }
+    const lines = this.tacs(t).map((x) => `${x.id}: TBD \u2014 ${x.text}`).join("\n");
+    (0, import_node_fs2.appendFileSync)(
+      f,
+      `
+## Round ${n}
+HEAD: ${head}
+DATE: ${(/* @__PURE__ */ new Date()).toISOString()}
+${lines}
+VERDICT: TBD
+`
+    );
+    this.out(f);
+  }
+  /** Locks QA's acceptance tests by blob hash; engineers may not change them. */
+  qaLock(tid, files) {
+    const t = this.findRec(tid);
+    const head = this.ticketHead(t);
+    if (!head) throw new DeliveryError("no ticket branch");
+    if (!files.length)
+      throw new DeliveryError(
+        "qa-lock needs --files a,b (repo-relative test paths committed on the ticket branch)"
+      );
+    const lines = files.map((f) => {
+      const h = this.git(["rev-parse", `${head}:${f}`], this.root, true);
+      if (!h) throw new DeliveryError(`${f} is not committed on ticket/${tid}`);
+      return `${h} ${f}`;
+    });
+    (0, import_node_fs2.mkdirSync)((0, import_node_path.dirname)(this.qaLockPath(t)), { recursive: true });
+    (0, import_node_fs2.writeFileSync)(this.qaLockPath(t), `${lines.join("\n")}
+`);
+    this.out(
+      `${tid}: locked ${files.length} QA test file(s) @ ${head.slice(0, 8)}`
+    );
+  }
+  changelog(tid, text) {
+    const t = this.findRec(tid);
+    if (!text) throw new DeliveryError("changelog needs text");
+    const e = this.findRec(str(t.fm.epic));
+    const line = `- ${tid}: ${text.replace(/\n/g, " ").trim()}`;
+    if (!/^## Changelog\s*$/m.test(e.body))
+      e.body = e.body.replace(/^## History/m, "## Changelog\n\n## History");
+    const existing = new RegExp(`^- ${tid}:.*$`, "m");
+    e.body = existing.test(e.body) ? e.body.replace(existing, line) : e.body.replace(
+      /^## Changelog\s*\n((?:<!--.*-->\n)?(?:- .*\n)*)/m,
+      (m) => `${m}${line}
+`
+    );
+    writeRec(e);
+    this.out(line);
+  }
+  merge(tid) {
+    const t = this.findRec(tid);
+    if (t.fm.status !== "qa-passed")
+      throw new DeliveryError(
+        `${tid} is ${str(t.fm.status)}; merge needs qa-passed`,
+        2
+      );
+    const epic = str(t.fm.epic);
+    const br = `ticket/${tid}`;
+    const ebr = `epic/${epic}`;
+    const base = this.git(["merge-base", ebr, br]) ?? "";
+    const dir = this.config().dir;
+    const touched = (this.git(["diff", "--name-only", base, br]) ?? "").split("\n").filter((p) => p.startsWith(`${dir}/`));
+    if (touched.length) {
+      throw new DeliveryError(
+        `${br} modifies delivery records (${touched.join(", ")}); engineers must not edit ${dir}/`,
+        2
+      );
+    }
+    this.commitRecords(epic, `${tid} records`, true);
+    const r = (0, import_node_child_process.spawnSync)(
+      "git",
+      ["merge", "--no-ff", "-q", "-m", `merge ${br}: ${str(t.fm.title)}`, br],
+      {
+        cwd: this.epicWt(epic),
+        encoding: "utf8"
+      }
+    );
+    if (r.status !== 0) {
+      (0, import_node_child_process.spawnSync)("git", ["merge", "--abort"], { cwd: this.epicWt(epic) });
+      throw new DeliveryError(
+        `merge conflict merging ${br} into ${ebr}: rebase the ticket branch onto ${ebr} and re-run gates:
+${r.stdout}${r.stderr}`,
+        2
+      );
+    }
+    if ((0, import_node_fs2.existsSync)(this.ticketWt(tid)))
+      this.git(["worktree", "remove", "--force", this.ticketWt(tid)]);
+    this.out(`${br} merged into ${ebr}`);
+  }
+  cleanup(eid) {
+    const base = this.config().baseBranch;
+    if (!this.gitOk([
+      "merge-base",
+      "--is-ancestor",
+      `epic/${eid}`,
+      `origin/${base}`
+    ])) {
+      throw new DeliveryError(
+        `epic/${eid} is not merged into origin/${base} yet (git fetch first?)`,
+        2
+      );
+    }
+    for (const t of this.epicTickets(eid)) {
+      const wt = this.ticketWt(str(t.fm.id));
+      if ((0, import_node_fs2.existsSync)(wt)) this.git(["worktree", "remove", "--force", wt]);
+    }
+    if ((0, import_node_fs2.existsSync)(this.epicWt(eid)))
+      this.git(["worktree", "remove", "--force", this.epicWt(eid)]);
+    this.out(
+      `removed worktrees for ${eid}; branches kept (delete them with git branch -d when you like)`
+    );
+  }
+  // ───────────── model routing ─────────────
+  model(role, id) {
+    const routing = this.routing();
+    const budget = this.config().budget;
+    const profile = routing.profiles[budget];
+    if (!profile) throw new DeliveryError(`unknown budget profile ${budget}`);
+    const shortRole = role.includes(":") ? role.split(":").pop() ?? role : role;
+    const isEngineer = shortRole.endsWith("-engineer") && !["staff-engineer", "devops-engineer"].includes(shortRole);
+    const rec = id ? this.findRec(id) : null;
+    const reasons = [];
+    let key = isEngineer ? "engineer" : shortRole;
+    if (isEngineer && rec?.fm.risk === "small" && profile["engineer@small"])
+      key = "engineer@small";
+    let tier = profile[key];
+    if (!tier) throw new DeliveryError(`role ${role} not in routing profile`);
+    const up = (from) => routing.tiers[Math.min(routing.tiers.indexOf(from) + 1, routing.tiers.length - 1)] ?? from;
+    if (isEngineer && rec) {
+      if (num(rec.fm.qa_round) >= routing.escalation.engineerQaRound) {
+        tier = up(tier);
+        reasons.push(`qa_round ${num(rec.fm.qa_round)}`);
+      } else if (num(rec.fm.red_gate_runs) >= routing.escalation.engineerRedGateRuns) {
+        tier = up(tier);
+        reasons.push(`${num(rec.fm.red_gate_runs)} red gate runs`);
+      }
+    }
+    if (shortRole === "solution-architect" && rec) {
+      const epic = str(rec.fm.id).startsWith("E-") ? rec : this.findRec(str(rec.fm.epic));
+      if (epic.fm.risk === routing.escalation.architectOnEpicRisk) {
+        tier = "opus";
+        reasons.push("epic risk high");
+      }
+    }
+    if (reasons.length && rec && str(rec.fm.id).startsWith("T-")) {
+      rec.fm.model_overrides = {
+        ...map(rec.fm.model_overrides),
+        [shortRole]: tier
+      };
+      writeRec(rec);
+    }
+    this.out(
+      JSON.stringify({
+        role: shortRole,
+        profile: budget,
+        model: tier,
+        escalated: reasons.length > 0,
+        reasons
+      })
+    );
+  }
+  // ───────────── scheduling, stats, board ─────────────
+  next(eid) {
+    const tickets = this.epicTickets(eid);
+    const byId = new Map(tickets.map((t) => [str(t.fm.id), t]));
+    const depsDone = (t) => list(t.fm.depends_on).every(
+      (d) => (byId.get(d) ?? this.findRec(d)).fm.status === "done"
+    );
+    const slots = Math.max(
+      0,
+      this.config().maxParallelEngineers - this.inFlight().length
+    );
+    const ids = (pred) => tickets.filter(pred).map((t) => str(t.fm.id));
+    const status = (t) => str(t.fm.status);
+    const done = tickets.filter(
+      (t) => ["done", "cancelled"].includes(status(t))
+    ).length;
+    const result = {
+      epic: eid,
+      epicStatus: str(this.findRec(eid).fm.status),
+      slotsFree: slots,
+      needsDesign: ids(
+        (t) => Boolean(t.fm.ui) && ["todo", "in-design"].includes(status(t))
+      ),
+      needsReady: ids(
+        (t) => status(t) === "todo" && !t.fm.ui || status(t) === "design-approved"
+      ),
+      needsQaPlan: ids(
+        (t) => status(t) === "ready" && !(0, import_node_fs2.existsSync)(this.artifact(t, "qa-plan"))
+      ),
+      startable: ids(
+        (t) => status(t) === "ready" && depsDone(t) && (0, import_node_fs2.existsSync)(this.artifact(t, "qa-plan"))
+      ).slice(0, slots),
+      inProgress: ids((t) => status(t) === "in-progress"),
+      inQa: ids((t) => status(t) === "in-qa"),
+      rework: ids((t) => status(t) === "rework"),
+      qaPassed: ids((t) => status(t) === "qa-passed"),
+      blocked: tickets.filter((t) => status(t) === "blocked").map((t) => ({
+        id: str(t.fm.id),
+        reason: str(t.fm.blocked_reason),
+        owner: str(t.fm.unblock_owner)
+      })),
+      done,
+      total: tickets.length,
+      allDone: tickets.length > 0 && done === tickets.length
+    };
+    this.out(JSON.stringify(result, null, 2));
+  }
+  stats(eid) {
+    const e = this.findRec(eid);
+    const tickets = this.epicTickets(eid);
+    const created = (section(e.body, "History") ?? "").match(
+      /^- (\d{4}-\d{2}-\d{2}) .*created/m
+    )?.[1] ?? null;
+    const gates = map(e.fm.gates);
+    const result = {
+      epic: eid,
+      status: str(e.fm.status),
+      risk: str(e.fm.risk),
+      gates,
+      profile: this.config().budget,
+      tickets: tickets.length,
+      byStatus: tickets.reduce((acc, t) => {
+        acc[str(t.fm.status)] = (acc[str(t.fm.status)] ?? 0) + 1;
+        return acc;
+      }, {}),
+      qaRounds: tickets.reduce((acc, t) => acc + num(t.fm.qa_round), 0),
+      reworkTickets: tickets.filter((t) => num(t.fm.qa_round) > 1).map((t) => `${str(t.fm.id)} (${num(t.fm.qa_round)} rounds)`),
+      escalations: tickets.flatMap(
+        (t) => Object.entries(map(t.fm.model_overrides)).map(
+          ([role, m]) => `${str(t.fm.id)}: ${role} \u2192 ${str(m)}`
+        )
+      ),
+      cancelled: tickets.filter((t) => t.fm.status === "cancelled").map((t) => str(t.fm.id)),
+      started: created,
+      planApproved: gates.plan ?? null,
+      accepted: gates.acceptance ?? null,
+      perTicket: tickets.map((t) => ({
+        id: str(t.fm.id),
+        domain: str(t.fm.domain),
+        risk: str(t.fm.risk),
+        ui: t.fm.ui ?? null,
+        status: str(t.fm.status),
+        qaRounds: num(t.fm.qa_round),
+        traces: list(t.fm.traces)
+      }))
+    };
+    this.out(JSON.stringify(result, null, 2));
+  }
+  /**
+   * Renders the repo's status file (`docs.statusFile`): rows whose ID is an epic `ref` are
+   * rewritten, epics without one get their own row, other rows are kept, and the pie is recounted.
+   * Only the first `| ID | …` table and its pie are touched.
+   */
+  statusMd(eid) {
+    const rel = this.config().docs.statusFile;
+    if (!rel)
+      throw new DeliveryError("no delivery.docs.statusFile in the manifest");
+    const file = (0, import_node_path.join)(eid ? this.epicWt(eid) : this.root, rel);
+    if (!(0, import_node_fs2.existsSync)(file)) throw new DeliveryError(`${file} not found`);
+    const lines = (0, import_node_fs2.readFileSync)(file, "utf8").split("\n");
+    const hdr = lines.findIndex((l) => /^\|\s*ID\s*\|/.test(l));
+    if (hdr < 0) throw new DeliveryError(`no "| ID | \u2026" table in ${rel}`);
+    let end = hdr + 2;
+    while (end < lines.length && (lines[end] ?? "").startsWith("|")) end++;
+    const label = (st) => ({
+      done: "\u2705 done",
+      cancelled: "\u{1F5D1}\uFE0F cancelled",
+      blocked: "\u26D4 blocked",
+      "in-delivery": "\u{1F6A7} doing",
+      "in-acceptance": "\u{1F6A7} doing"
+    })[st] ?? "\u{1F4E5} todo";
+    const nextAction = (e) => {
+      const id = str(e.fm.id);
+      const tickets = this.epicTickets(id);
+      const done = tickets.filter((t) => t.fm.status === "done").length;
+      const actions = {
+        draft: `${id}: draft, /po intake`,
+        proposed: `${id}: waiting for your intake gate`,
+        approved: `${id}: /refine`,
+        planned: `${id}: waiting for your plan gate`,
+        "in-delivery": `${id}: ${done}/${tickets.length} tickets done`,
+        "in-acceptance": `${id}: waiting for your acceptance (/accept)`,
+        done: `none; ${id} accepted ${str(map(e.fm.gates).acceptance)}`.trim(),
+        blocked: `${id}: blocked, ${str(e.fm.blocked_reason)} (unblock: ${str(e.fm.unblock_owner)})`,
+        cancelled: `${id}: cancelled`
+      };
+      return actions[str(e.fm.status)] ?? id;
+    };
+    const epics = this.allRecs("epics").map(readRec);
+    const byRef = new Map(
+      epics.filter((e) => e.fm.ref).map((e) => [str(e.fm.ref), e])
+    );
+    const cell = (s) => s.replace(/\|/g, "\\|");
+    const rows = lines.slice(hdr + 2, end).map((l) => {
+      const c = l.split("|").slice(1, -1).map((x) => x.trim());
+      const e = byRef.get(c[0] ?? "");
+      if (!e) return l;
+      byRef.delete(c[0] ?? "");
+      return `| ${c[0]} | ${c[1]} | ${label(str(e.fm.status))} | ${cell(nextAction(e))} |`;
+    });
+    for (const e of [...byRef.values(), ...epics.filter((x) => !x.fm.ref)]) {
+      rows.push(
+        `| ${str(e.fm.ref) || str(e.fm.id)} | ${cell(str(e.fm.title))} | ${label(str(e.fm.status))} | ${cell(nextAction(e))} |`
+      );
+    }
+    const count = (k) => rows.filter((r) => (r.split("|")[3] ?? "").includes(k)).length;
+    let out = [...lines.slice(0, hdr + 2), ...rows, ...lines.slice(end)].join(
+      "\n"
+    );
+    out = out.replace(
+      /(pie[^\n]*\n(?:\s*title[^\n]*\n)?)((?:\s*"[^"]+"\s*:\s*\d+\n)+)/,
+      (_m, head, body) => {
+        const indent = body.match(/^(\s*)/)?.[1] ?? "";
+        const parts = [
+          ["Done", count("done")],
+          ["Doing", count("doing")],
+          ["To do", count("todo")],
+          ["Blocked", count("blocked")]
+        ];
+        return `${head}${parts.filter(([, n]) => n > 0).map(([k, n]) => `${indent}"${k}" : ${n}`).join("\n")}
+`;
+      }
+    );
+    (0, import_node_fs2.writeFileSync)(file, out);
+    this.out(
+      `rendered ${(0, import_node_path.relative)(this.root, file) || file} (${rows.length} rows)`
+    );
+  }
+  board() {
+    const epics = this.allRecs("epics").map(readRec).sort((a, b) => str(a.fm.id).localeCompare(str(b.fm.id)));
+    const waiting = {
+      proposed: "intake",
+      planned: "plan",
+      "in-acceptance": "acceptance"
+    };
+    const stamp = (/* @__PURE__ */ new Date()).toISOString().slice(0, 16).replace("T", " ");
+    let md = `# Delivery board: ${(0, import_node_path.basename)(this.root)}
+_Rendered ${stamp} by sdlckit-delivery. Do not edit._
+
+`;
+    const you = epics.filter((e) => waiting[str(e.fm.status)]);
+    md += `## Waiting for you
+${you.length ? you.map(
+      (e) => `- **${str(e.fm.id)}** ${str(e.fm.title)}: ${waiting[str(e.fm.status)]} gate`
+    ).join("\n") : "- nothing"}
+
+`;
+    const blocked = [...epics, ...this.allRecs("tickets").map(readRec)].filter(
+      (r) => r.fm.status === "blocked"
+    );
+    md += `## Blocked
+${blocked.length ? blocked.map(
+      (r) => `- **${str(r.fm.id)}** ${str(r.fm.title)}: ${str(r.fm.blocked_reason)} (unblock: ${str(r.fm.unblock_owner)})`
+    ).join("\n") : "- nothing"}
+
+## Epics
+`;
+    for (const e of epics) {
+      const tickets = this.epicTickets(str(e.fm.id)).sort(
+        (a, b) => str(a.fm.id).localeCompare(str(b.fm.id))
+      );
+      const done = tickets.filter((t) => t.fm.status === "done").length;
+      const ref = e.fm.ref ? ` (${str(e.fm.ref)})` : "";
+      md += `
+### ${str(e.fm.id)}${ref} \xB7 ${str(e.fm.title)}  \`${str(e.fm.status)}\` \xB7 ${str(e.fm.priority)} \xB7 ${done}/${tickets.length} done
+`;
+      if (tickets.length) {
+        md += "| Ticket | Title | Domain | Status | QA round | Depends on |\n|---|---|---|---|---|---|\n";
+        for (const t of tickets) {
+          md += `| ${str(t.fm.id)} | ${str(t.fm.title)} | ${str(t.fm.domain)}${t.fm.ui ? " \xB7 ui" : ""} | ${str(t.fm.status)} | ${num(t.fm.qa_round)} | ${list(t.fm.depends_on).join(", ") || "\u2014"} |
+`;
+        }
+      }
+    }
+    (0, import_node_fs2.mkdirSync)(this.mainDir(), { recursive: true });
+    (0, import_node_fs2.writeFileSync)((0, import_node_path.join)(this.mainDir(), "BOARD.md"), md);
+    this.out(md.trimEnd());
+    return md;
+  }
+  // ───────────── init, create, read, edit ─────────────
+  init() {
+    const d = this.mainDir();
+    for (const s of [
+      "intake",
+      "epics",
+      "tickets",
+      "designs",
+      "qa",
+      "adr",
+      "reports"
+    ])
+      (0, import_node_fs2.mkdirSync)((0, import_node_path.join)(d, s), { recursive: true });
+    const gitignore = (0, import_node_path.join)(this.root, ".gitignore");
+    const dir = this.config().dir;
+    const current = (0, import_node_fs2.existsSync)(gitignore) ? (0, import_node_fs2.readFileSync)(gitignore, "utf8") : "";
+    if (!current.includes(`${dir}/.worktrees/`)) {
+      (0, import_node_fs2.appendFileSync)(
+        gitignore,
+        `
+# sdlckit delivery (scratch)
+${dir}/.worktrees/
+${dir}/BOARD.md
+${dir}/qa/*/evidence/
+`
+      );
+    }
+    this.board();
+    this.err(`
+initialised ${d}`);
+  }
+  create(kind, o) {
+    const title = typeof o.title === "string" ? o.title : "";
+    if (!title) throw new DeliveryError("--title required");
+    const epicId = typeof o.epic === "string" ? o.epic : "";
+    if (kind === "epic") {
+      const id = this.nextId("E", "epics");
+      const f = (0, import_node_path.join)(this.mainDir(), "epics", `${id}-${slug(title)}.md`);
+      (0, import_node_fs2.mkdirSync)((0, import_node_path.dirname)(f), { recursive: true });
+      (0, import_node_fs2.writeFileSync)(f, this.template("epic.md", { id, title, date: today() }));
+      this.out(JSON.stringify({ id, file: f }));
+      return;
+    }
+    if (kind === "ticket") {
+      const domain = typeof o.domain === "string" ? o.domain : "";
+      if (!epicId || !domain)
+        throw new DeliveryError("--epic and --domain required");
+      const e = this.findRec(epicId);
+      if (!this.isCut(epicId)) throw new DeliveryError(`cut ${epicId} first`);
+      const engineers = {
+        ...this.routing().engineers,
+        ...this.config().engineers
+      };
+      const id = this.nextId("T", "tickets");
+      const f = (0, import_node_path.join)(this.recDir(e), "tickets", `${id}-${slug(title)}.md`);
+      (0, import_node_fs2.writeFileSync)(
+        f,
+        this.template("ticket.md", {
+          id,
+          epic: epicId,
+          title,
+          domain,
+          owner: engineers[domain] ?? "unassigned",
+          date: today()
+        })
+      );
+      const rec = readRec(f);
+      if (o.ui !== void 0) rec.fm.ui = o.ui === true || o.ui === "true";
+      if (typeof o.risk === "string") rec.fm.risk = o.risk;
+      if (typeof o.depends === "string") rec.fm.depends_on = csv(o.depends);
+      if (typeof o.traces === "string") rec.fm.traces = csv(o.traces);
+      writeRec(rec);
+      this.out(JSON.stringify({ id, file: f }));
+      return;
+    }
+    if (kind === "adr") {
+      if (!epicId) throw new DeliveryError("--epic required");
+      const e = this.findRec(epicId);
+      if (this.adrDirMode()) {
+        if (!this.isCut(epicId)) throw new DeliveryError(`cut ${epicId} first`);
+        const max = Math.max(
+          0,
+          ...[...this.docAdrs().keys()].map((k) => Number(k.slice(4)))
+        );
+        const n = String(max + 1).padStart(4, "0");
+        const dir = (0, import_node_path.join)(this.epicWt(epicId), this.config().docs.adrDir ?? "");
+        (0, import_node_fs2.mkdirSync)(dir, { recursive: true });
+        const f2 = (0, import_node_path.join)(dir, `${n}-${slug(title)}.md`);
+        const ref = e.fm.ref ? ` (${str(e.fm.ref)})` : "";
+        (0, import_node_fs2.writeFileSync)(
+          f2,
+          `# ADR ${n}: ${title}
+
+- **Status:** proposed
+- **Epic:** ${epicId}${ref}
+- **Relates to:** 
+
+## Context
+
+## Decision
+
+## Alternatives considered
+
+## Consequences
+`
+        );
+        this.out(
+          JSON.stringify({
+            id: `ADR-${n}`,
+            file: f2,
+            note: `repo ADR style (${this.config().docs.adrDir}); follow the format of existing ADRs there`
+          })
+        );
+        return;
+      }
+      const id = this.nextId("ADR", "adr");
+      const f = (0, import_node_path.join)(this.recDir(e), "adr", `${id}-${slug(title)}.md`);
+      (0, import_node_fs2.mkdirSync)((0, import_node_path.dirname)(f), { recursive: true });
+      (0, import_node_fs2.writeFileSync)(
+        f,
+        `---
+id: ${id}
+epic: ${epicId}
+status: proposed
+---
+${this.template("adr.md", { id, title, epic: epicId, date: today() })}`
+      );
+      this.out(JSON.stringify({ id, file: f }));
+      return;
+    }
+    throw new DeliveryError("new epic|ticket|adr");
+  }
+  path(id, kind) {
+    const r = this.findRec(id);
+    const rid = str(r.fm.id);
+    if (kind === "report" || kind === "epic") {
+      const f2 = kind === "epic" ? r.file : (0, import_node_path.join)(this.recDir(r), "reports", `${rid}.md`);
+      if (!(0, import_node_fs2.existsSync)(f2)) {
+        (0, import_node_fs2.mkdirSync)((0, import_node_path.dirname)(f2), { recursive: true });
+        (0, import_node_fs2.writeFileSync)(
+          f2,
+          this.template("report.md", { id: rid, title: str(r.fm.title) })
+        );
+      }
+      this.out(f2);
+      return;
+    }
+    if (kind === "ticket" || !kind) {
+      this.out(r.file);
+      return;
+    }
+    if (kind === "worktree") {
+      this.out(rid.startsWith("E-") ? this.epicWt(rid) : this.ticketWt(rid));
+      return;
+    }
+    const f = this.artifact(r, kind);
+    const tpl = ARTIFACT_TEMPLATES[kind];
+    if (tpl && !(0, import_node_fs2.existsSync)(f)) {
+      (0, import_node_fs2.mkdirSync)((0, import_node_path.dirname)(f), { recursive: true });
+      (0, import_node_fs2.writeFileSync)(f, this.template(tpl, { id: rid, title: str(r.fm.title) }));
+    }
+    this.out(f);
+  }
+  show(id) {
+    const r = this.findRec(id);
+    this.out(JSON.stringify({ ...r.fm, file: r.file }, null, 2));
+  }
+  list(kind) {
+    for (const r of this.allRecs(kind === "tickets" ? "tickets" : "epics").map(
+      readRec
+    )) {
+      this.out(`${str(r.fm.id)}	${str(r.fm.status)}	${str(r.fm.title)}`);
+    }
+  }
+  set(id, pairs) {
+    const rec = this.findRec(id);
+    for (const p of pairs) {
+      const i = p.indexOf("=");
+      const k = p.slice(0, i);
+      const v = p.slice(i + 1);
+      const adrStatus = k === "status" && id.startsWith("ADR-") && ["proposed", "accepted", "superseded", "rejected"].includes(v);
+      if (LOCKED_FIELDS.includes(k) && !adrStatus)
+        throw new DeliveryError(`'${k}' is managed by sdlckit-delivery`);
+      rec.fm[k] = parseScalar(v);
+    }
+    writeRec(rec);
+    this.out(JSON.stringify(rec.fm));
+  }
+};
+function csv(value) {
+  return value.split(",").map((s) => s.trim()).filter(Boolean);
+}
+function contractTokens(text) {
+  const t = (text ?? "").replace(/<!--[\s\S]*?-->/g, "");
+  const codes = /* @__PURE__ */ new Set();
+  const statusCodes = /* @__PURE__ */ new Set();
+  const routes = /* @__PURE__ */ new Set();
+  for (const m of t.matchAll(/code:\s*['"]([A-Z][A-Z0-9_]{3,})['"]/g))
+    if (m[1]) codes.add(m[1]);
+  for (const m of t.matchAll(
+    /\b[1-5]\d\d\s+`?\{?\s*(?:code:\s*)?['"]?([A-Z][A-Z0-9_]{3,})\b/g
+  )) {
+    if (m[1]) {
+      codes.add(m[1]);
+      statusCodes.add(m[1]);
+    }
+  }
+  for (const m of t.matchAll(
+    /\b(GET|POST|PUT|PATCH|DELETE)\s+`?(\/[\w\-/:{}<>. ]*?)(?=[`\s,;)?#]|$)/gm
+  )) {
+    routes.add(`${m[1]} ${(m[2] ?? "").replace(/[./]+$/, "") || "/"}`);
+  }
+  return { codes, statusCodes, routes };
+}
+var isParam = (segment) => /^(:\w+|\{\w+\}|<[^>]+>)$/.test(segment ?? "");
+function routeMatch(archRoute, route) {
+  const [am, ap = ""] = archRoute.split(" ");
+  const [rm, rp = ""] = route.split(" ");
+  if (am !== rm) return false;
+  const a = ap.split("/");
+  const b = rp.split("/");
+  if (a.length !== b.length) return false;
+  return a.every((seg, i) => seg === b[i] || isParam(seg) || isParam(b[i]));
+}
+function contractCheck(text, requiredRulebooks) {
+  const blocks = [...text.matchAll(/```ya?ml\n([\s\S]*?)```/g)];
+  const last = blocks[blocks.length - 1];
+  if (!last) return ["no ```yaml block found"];
+  const y = last[1] ?? "";
+  const top = (k) => new RegExp(`^${k}:`, "m").test(y);
+  const errs = [];
+  for (const k of [
+    "agent",
+    "mode",
+    "subject",
+    "status",
+    "summary",
+    "artifacts",
+    "items",
+    "questions_for_user",
+    "next",
+    "rulebooks_read"
+  ]) {
+    if (!top(k)) errs.push(`missing top-level key '${k}'`);
+  }
+  const status = y.match(/^status:\s*(\S+)/m)?.[1];
+  if (status && !["done", "changes-requested", "blocked"].includes(status)) {
+    errs.push(`status '${status}' not in done|changes-requested|blocked`);
+  }
+  for (const k of ["role", "blockers", "majors", "minors", "epic"]) {
+    if (top(k))
+      errs.push(`non-contract key '${k}' (use items[] with severity)`);
+  }
+  const items = y.split(/^items:/m)[1] ?? "";
+  for (const m of items.matchAll(/severity:\s*(\S+)/g)) {
+    if (!["blocker", "major", "minor", "suggestion"].includes(m[1] ?? ""))
+      errs.push(`bad severity '${m[1]}'`);
+  }
+  const read = (y.split(/^rulebooks_read:/m)[1] ?? "").split(/^\w+:/m)[0] ?? "";
+  for (const r of requiredRulebooks)
+    if (!read.includes(r))
+      errs.push(`rulebook '${r}' not listed in rulebooks_read`);
+  return errs;
+}
+
+// src/cli.ts
+var USAGE = `sdlckit-delivery <command>
+  init                                   scaffold .delivery/ and the .gitignore block
+  new epic --title T                     create a draft epic (main checkout)
+  new ticket --epic E --title T --domain D [--ui true] [--risk small|normal|high] [--depends T-1,T-2] [--traces AC1,AC2]
+  new adr --epic E --title T
+  show <id> | list [epics|tickets]       read records
+  path <id> [ticket|epic|report|design|design-review|qa-plan|qa-report|gates-log|review|worktree]
+  set <id> key=value ...                 edit fields the script doesn't manage
+  transition <id> <state> [--reason R] [--unblock-owner O]
+  gate <E> intake|plan|acceptance        record the user's approval (only after an explicit yes)
+  dor <T> | dod <T>                      Definition of Ready / Done checks
+  drift <E>                              error codes and routes, Architecture vs tickets (enforced at planned)
+  cut <E>                                create epic/E branch and worktree, move the epic record into it
+  worktree <T>                           create the ticket/T worktree from the epic branch
+  gates <T> [gate ...]                   run the manifest gates in the ticket worktree, write gates.log
+  review <T> --blockers N --majors N [--reviewers a,b]
+  qa-round <T>                           open the next QA round, stamped with the tested HEAD
+  qa-lock <T> --files a,b                lock QA acceptance tests (engineers may not change them)
+  changelog <T> <text>                   add or replace the ticket's line in the epic Changelog
+  merge <T>                              merge a qa-passed ticket into the epic branch
+  cleanup <E>                            remove worktrees after the epic PR is merged
+  model <role> [id]                      resolve the model tier (budget profile and escalation)
+  next <E>                               scheduling view (JSON)
+  stats <E>                              epic stats for reports (JSON)
+  status-md [--in E]                     render docs.statusFile's table and pie from records
+  board                                  render .delivery/BOARD.md
+  contract-check <file|-> [--rulebooks a,b]   validate an agent reply against the output contract`;
+function defaultHome() {
+  if (process.env.SDLCKIT_DELIVERY_HOME)
+    return process.env.SDLCKIT_DELIVERY_HOME;
+  const script = process.argv[1];
+  if (!script)
+    throw new DeliveryError("cannot locate the plugin root: no script path");
+  return (0, import_node_path2.join)((0, import_node_path2.dirname)((0, import_node_fs3.realpathSync)(script)), "..");
+}
+function parse(argv) {
+  const pos = [];
+  const opts = {};
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i] ?? "";
+    if (a.startsWith("--")) {
+      const next = argv[i + 1];
+      if (next === void 0 || next.startsWith("--")) opts[a.slice(2)] = true;
+      else {
+        opts[a.slice(2)] = next;
+        i++;
+      }
+    } else pos.push(a);
+  }
+  return { pos, opts };
+}
+function run(argv, cwd, out = (line) => process.stdout.write(`${line}
+`), err = (line) => process.stderr.write(`${line}
+`), home = defaultHome()) {
+  const [command, ...rest] = argv;
+  const { pos, opts } = parse(rest);
+  const need = (n) => {
+    if (pos.length < n)
+      throw new DeliveryError(
+        `usage error for '${command}': see sdlckit-delivery help`
+      );
+  };
+  const a = (i) => pos[i] ?? "";
+  if (!command || command === "help") {
+    out(USAGE);
+    return 0;
+  }
+  if (command === "contract-check") {
+    const file = a(0);
+    if (!file)
+      throw new DeliveryError(
+        "usage: contract-check <reply-file | -> [--rulebooks a,b]",
+        2
+      );
+    if (file === "-" && process.stdin.isTTY)
+      throw new DeliveryError("contract-check -: nothing piped on stdin", 2);
+    const text = (0, import_node_fs3.readFileSync)(file === "-" ? 0 : file, "utf8");
+    const required = typeof opts.rulebooks === "string" ? opts.rulebooks.split(",").filter(Boolean) : [];
+    const errs = contractCheck(text, required);
+    out(
+      errs.length ? `CONTRACT FAIL
+ - ${errs.join("\n - ")}` : "CONTRACT PASS"
+    );
+    return errs.length ? 2 : 0;
+  }
+  const d = new Delivery(cwd, home, out, err);
+  switch (command) {
+    case "init":
+      d.init();
+      return 0;
+    case "new":
+      need(1);
+      d.create(a(0), opts);
+      return 0;
+    case "show":
+      need(1);
+      d.show(a(0));
+      return 0;
+    case "list":
+      d.list(a(0));
+      return 0;
+    case "path":
+      need(1);
+      d.path(a(0), pos[1]);
+      return 0;
+    case "set":
+      need(2);
+      d.set(a(0), pos.slice(1));
+      return 0;
+    case "transition":
+      need(2);
+      d.transition(a(0), a(1), opts);
+      return 0;
+    case "gate":
+      need(2);
+      d.gate(a(0), a(1));
+      return 0;
+    case "dor":
+    case "dod": {
+      need(1);
+      const rec = d.findRec(a(0));
+      const errs = command === "dor" ? d.dor(rec) : d.dod(rec);
+      const label = command === "dor" ? "DoR" : "DoD";
+      out(
+        errs.length ? `${label} FAIL
+ - ${errs.join("\n - ")}` : `${label} PASS`
+      );
+      return errs.length ? 2 : 0;
+    }
+    case "drift": {
+      need(1);
+      const result = d.drift(a(0));
+      const bad = result.inArchitectureOnly.length + result.inTicketsOnly.length;
+      out(JSON.stringify(result, null, 2));
+      out(bad ? "DRIFT FAIL" : "DRIFT PASS");
+      return bad ? 2 : 0;
+    }
+    case "cut":
+      need(1);
+      d.cut(a(0));
+      return 0;
+    case "worktree":
+      need(1);
+      d.worktree(a(0));
+      return 0;
+    case "gates":
+      need(1);
+      return d.gates(a(0), pos.slice(1)) ? 0 : 1;
+    case "review":
+      need(1);
+      d.review(a(0), opts);
+      return 0;
+    case "qa-round":
+      need(1);
+      d.qaRound(a(0));
+      return 0;
+    case "qa-lock":
+      need(1);
+      d.qaLock(
+        a(0),
+        String(typeof opts.files === "string" ? opts.files : "").split(",").map((x) => x.trim()).filter(Boolean)
+      );
+      return 0;
+    case "changelog":
+      need(2);
+      d.changelog(a(0), pos.slice(1).join(" "));
+      return 0;
+    case "merge":
+      need(1);
+      d.merge(a(0));
+      return 0;
+    case "cleanup":
+      need(1);
+      d.cleanup(a(0));
+      return 0;
+    case "model":
+      need(1);
+      d.model(a(0), pos[1]);
+      return 0;
+    case "next":
+      need(1);
+      d.next(a(0));
+      return 0;
+    case "stats":
+      need(1);
+      d.stats(a(0));
+      return 0;
+    case "status-md":
+      d.statusMd(typeof opts.in === "string" ? opts.in : void 0);
+      return 0;
+    case "board":
+      d.board();
+      return 0;
+  }
+  out(USAGE);
+  return 1;
+}
+
+// src/bin.ts
+try {
+  process.exitCode = run(process.argv.slice(2), process.cwd());
+} catch (cause) {
+  if (cause instanceof DeliveryError) {
+    process.stderr.write(`sdlckit-delivery: ${cause.message}
+`);
+    process.exitCode = cause.code;
+  } else {
+    const detail = cause instanceof Error ? cause.stack ?? cause.message : String(cause);
+    process.stderr.write(`sdlckit-delivery: ${detail}
+`);
+    process.exitCode = 1;
+  }
+}

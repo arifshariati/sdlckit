@@ -24,6 +24,11 @@
       "name": "sdlckit-infra",
       "source": "./plugins/sdlckit-infra",
       "description": "Infrastructure experts and rulebooks for AWS, Terraform and AI agent systems. Dormant in repos without those domains; never applies or deploys anything."
+    },
+    {
+      "name": "sdlckit-team",
+      "source": "./plugins/sdlckit-team",
+      "description": "The delivery team: a PO interviews you, architect, tech lead and staff engineer plan, a designer specs the UI, engineers build in worktrees, QA verifies with evidence, and you approve at three gates."
     }
   ]
 }

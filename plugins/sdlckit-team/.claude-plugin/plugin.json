@@ -1,0 +1,22 @@
+{
+  "name": "sdlckit-team",
+  "version": "0.1.0",
+  "description": "The delivery team: a PO interviews you, architect, tech lead and staff engineer plan, a designer specs the UI, engineers build in worktrees, QA verifies with evidence, and you approve at three gates.",
+  "author": {
+    "name": "Mohammad Arif"
+  },
+  "homepage": "https://github.com/arifshariati/sdlckit",
+  "repository": "https://github.com/arifshariati/sdlckit",
+  "license": "MIT",
+  "keywords": [
+    "claude-code",
+    "sdlc",
+    "team"
+  ],
+  "dependencies": [
+    "sdlckit-workflow",
+    "sdlckit-backend",
+    "sdlckit-frontend",
+    "sdlckit-infra"
+  ]
+}

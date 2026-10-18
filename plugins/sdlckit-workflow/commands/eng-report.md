@@ -16,9 +16,9 @@ You are producing the **engineering metrics report**. Spec: `${CLAUDE_PLUGIN_ROO
 3. Present the output, then add a short interpretation:
    - what is trending (finding categories, review rounds, false-positive rate);
    - the **north-star**: are valid human PR comments per change going down? If PR-comment data is
-     sparse, say so and suggest logging recurring comments with `/eng-learn`;
+     sparse, say so and suggest logging recurring comments with `/sdlckit-workflow:eng-learn`;
    - one to three concrete suggestions (for example "N+1 findings recur: encode a review rule with
-     `/eng-learn`").
+     `/sdlckit-workflow:eng-learn`").
 
 This is read-only. Metrics are counts only, never prompt or response content. If there are none yet,
 say so and point to the commands that create them.

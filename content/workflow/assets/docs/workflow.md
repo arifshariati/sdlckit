@@ -1,7 +1,7 @@
 # sdlckit workflow
 
-The engineering workflow behind `/implement`, `/fix`, `/investigate`, `/review`, `/pr-ready`,
-`/eng-init`, `/eng-learn` and `/eng-report`. It plans a change with the right specialists, makes it,
+The engineering workflow behind `/sdlckit-workflow:implement`, `/sdlckit-workflow:fix`, `/sdlckit-workflow:investigate`, `/sdlckit-workflow:review`, `/sdlckit-workflow:pr-ready`,
+`/sdlckit-workflow:eng-init`, `/sdlckit-workflow:eng-learn` and `/sdlckit-workflow:eng-report`. It plans a change with the right specialists, makes it,
 proves it with the project's real gates, reviews the diff, and stops at PR-readiness.
 
 ## 1. Core principle
@@ -19,12 +19,12 @@ No agent may say a gate passed unless `sdlckit-eng gates` ran it and printed `GA
 ## 2. How it runs in Claude Code
 
 ```
-you ── /implement <change>
+you ── /sdlckit-workflow:implement <change>
         │  main thread = orchestrator (subagents can't start subagents)
         │  1. classify the change (change-classifier)
         │  2. read the manifest (.claude/engineering.json)
         │  3. active domains = domains the diff touches ∩ domains present in the manifest
-        │  4. choose specialists by risk (docs/routing.md)
+        │  4. choose specialists by risk (the review-routing rulebook)
         ├─▶ architect + domain specialists, in parallel → one plan → your approval
         ├─▶ the main thread writes the code
         ├─▶ sdlckit-eng gates (format, lint, typecheck, test …)
@@ -38,7 +38,7 @@ Context loads progressively: manifest → the relevant rulebook → the files th
 
 ## 3. The project manifest
 
-`/eng-init` writes `<repo>/.claude/engineering.json` (schema: `manifest.schema.json` in this folder)
+`/sdlckit-workflow:eng-init` writes `<repo>/.claude/engineering.json` (schema: `manifest.schema.json` in this folder)
 after confirming it with you:
 
 - `domains`: each with `present: true|false` and path globs. An absent domain's expert never fires.
@@ -50,7 +50,7 @@ after confirming it with you:
 
 ## 4. Routing
 
-`routing.md` in this folder is the single source of truth: which specialists fire for which change,
+The `review-routing` rulebook is the single source of truth: which specialists fire for which change,
 the risk rules that make an optional reviewer required, and workflow depth by change size. Small
 changes skip the multi-agent review entirely.
 
@@ -72,12 +72,12 @@ escalation, a security-policy change, or a change to production data.
 
 ## 7. Knowledge loop and metrics
 
-- `/eng-learn` turns a recurring human PR comment into a durable rule **in the project**: a lint
+- `/sdlckit-workflow:eng-learn` turns a recurring human PR comment into a durable rule **in the project**: a lint
   rule, a test, a review rule in `.claude/engineering/rules.md`, or a line in the repo's `CLAUDE.md`,
   recorded in `.claude/engineering/lessons.md`.
 - Each run appends counts to a per-project metrics store in the plugin's data folder
   (`sdlckit-eng metrics`): runs, findings, review rounds, false positives. Never prompt content.
-- `/eng-report` summarizes them. The north-star is fewer valid human PR comments per change.
+- `/sdlckit-workflow:eng-report` summarizes them. The north-star is fewer valid human PR comments per change.
 
 ## 8. Non-goals
 

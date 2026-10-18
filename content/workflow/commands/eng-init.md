@@ -65,8 +65,8 @@ manifest schema: `${CLAUDE_PLUGIN_ROOT}/docs/manifest.schema.json`) for the curr
      the first UI epic (decision: always shadcn).
 
 8. **Report.** Show the written manifest path and a one-line summary. Remind the user the fleet is
-   now active here and that `/implement`, `/review`, `/pr-ready` will use these exact commands —
-   and, if delivery was enabled, that `/po <idea or feature list>` starts the team.
+   now active here and that `/sdlckit-workflow:implement`, `/sdlckit-workflow:review`, `/sdlckit-workflow:pr-ready` will use these exact commands —
+   and, if delivery was enabled, that `/sdlckit-team:po <idea or feature list>` starts the team.
 
 ## Guardrails
 - Validate the final JSON parses (`node -e "require('<path>')"`).

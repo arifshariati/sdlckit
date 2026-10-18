@@ -1,3 +1,12 @@
+---
+name: review-routing
+description: "Reviewer routing for the sdlckit workflow: which specialists fire for which change, risk rules that make a reviewer required, workflow depth by change size, project rules, and plugin-scoped agent ids."
+category: workflow
+version: 0.1.0
+status: current
+verified: 2026-10-18
+claudeCodeVersion: 2.1.302
+---
 # Routing — single source of truth
 
 The orchestrator (any command) selects specialists using: **classification × diff × manifest**.
@@ -58,7 +67,7 @@ deterministic problems.
 
 ## Project rules
 Every reviewer also reads `<repo>/.claude/engineering/rules.md` when it exists: the project's own
-review rules, written by `/eng-learn`, alongside the manifest `conventions`.
+review rules, written by `/sdlckit-workflow:eng-learn`, alongside the manifest `conventions`.
 
 ## Agent ids
 Dispatch agents by their plugin-scoped id: workflow reviewers are `sdlckit-workflow:<name>`, domain

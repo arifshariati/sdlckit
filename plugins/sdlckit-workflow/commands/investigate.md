@@ -23,7 +23,7 @@ Question: **$ARGUMENTS**
 
 ## Output
 A tight report: Findings (with evidence) → Root cause/Answer → Recommendation. No edits. End by
-offering to `/fix` or `/implement` the recommendation if the user wants.
+offering to `/sdlckit-workflow:fix` or `/sdlckit-workflow:implement` the recommendation if the user wants.
 
 ## Guardrails
 No code changes. No hallucinated results — `TBD / requires evidence` when unknown. For vendor/
