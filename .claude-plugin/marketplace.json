@@ -1,0 +1,29 @@
+{
+  "name": "sdlckit",
+  "description": "Claude Code, engineered. An opinionated SDLC workflow for Claude Code.",
+  "owner": {
+    "name": "Mohammad Arif"
+  },
+  "plugins": [
+    {
+      "name": "sdlckit-workflow",
+      "source": "./plugins/sdlckit-workflow",
+      "description": "The core engineering workflow: plan with the right specialists, implement, prove it with the project's real gates, review the diff, fix, and reach PR-readiness."
+    },
+    {
+      "name": "sdlckit-backend",
+      "source": "./plugins/sdlckit-backend",
+      "description": "Backend experts and rulebooks for NestJS, PostgreSQL and Supabase. They review changes only in repos where those domains are present."
+    },
+    {
+      "name": "sdlckit-frontend",
+      "source": "./plugins/sdlckit-frontend",
+      "description": "Frontend experts and rulebooks for React, React Native and Vite, plus ui-craft, the UI quality standard for Tailwind, shadcn and NativeWind."
+    },
+    {
+      "name": "sdlckit-infra",
+      "source": "./plugins/sdlckit-infra",
+      "description": "Infrastructure experts and rulebooks for AWS, Terraform and AI agent systems. Dormant in repos without those domains; never applies or deploys anything."
+    }
+  ]
+}

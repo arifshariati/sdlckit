@@ -1,0 +1,5 @@
+{
+  "version": "0.1.0",
+  "description": "Infrastructure experts and rulebooks for AWS, Terraform and AI agent systems. Dormant in repos without those domains; never applies or deploys anything.",
+  "dependencies": ["sdlckit-workflow"]
+}

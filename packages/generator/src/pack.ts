@@ -26,8 +26,8 @@ export const packSchema = z.object({
       z
         .string()
         .regex(
-          /^packages\/[^.][^\s]*\.js$/,
-          "bin targets must be a packages/**/*.js file",
+          /^packages\/[^.]\S*\.c?js$/,
+          "bin targets must be a packages/**/*.js or .cjs file",
         ),
     )
     .optional(),

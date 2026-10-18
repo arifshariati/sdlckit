@@ -1,0 +1,5 @@
+{
+  "version": "0.1.0",
+  "description": "Frontend experts and rulebooks for React, React Native and Vite, plus ui-craft, the UI quality standard for Tailwind, shadcn and NativeWind.",
+  "dependencies": ["sdlckit-workflow"]
+}

@@ -1,0 +1,222 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/arifshariati/sdlckit/blob/main/content/workflow/assets/docs/manifest.schema.json",
+  "title": "sdlckit project manifest",
+  "description": "Per-repo manifest written by /eng-init. Records the real gate commands and which domains actually exist in this repo. Read by every engineering command.",
+  "type": "object",
+  "required": ["version", "project", "packageManager", "domains", "gates"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "project": {
+      "type": "string"
+    },
+    "generatedAt": {
+      "type": "string",
+      "description": "ISO date"
+    },
+    "packageManager": {
+      "type": "string",
+      "enum": [
+        "pnpm",
+        "npm",
+        "yarn",
+        "bun",
+        "cargo",
+        "go",
+        "pip",
+        "poetry",
+        "uv",
+        "other",
+        "none"
+      ]
+    },
+    "monorepo": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "tool": {
+          "type": "string",
+          "enum": ["turbo", "nx", "lerna", "pnpm-workspaces", "none"]
+        },
+        "workspaces": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "domains": {
+      "type": "object",
+      "description": "Keys are domain ids. A domain with present:false disables its specialist for this repo.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["present"],
+        "additionalProperties": false,
+        "properties": {
+          "present": {
+            "type": "boolean"
+          },
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "migrations": {
+            "type": ["string", "null"]
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "description": "Exact shell commands discovered from the repo. null = not available; the system must not invent it.",
+      "additionalProperties": {
+        "type": ["string", "null"]
+      },
+      "properties": {
+        "format": {
+          "type": ["string", "null"]
+        },
+        "lint": {
+          "type": ["string", "null"]
+        },
+        "typecheck": {
+          "type": ["string", "null"]
+        },
+        "test": {
+          "type": ["string", "null"]
+        },
+        "test-affected": {
+          "type": ["string", "null"]
+        },
+        "e2e": {
+          "type": ["string", "null"]
+        },
+        "a11y": {
+          "type": ["string", "null"]
+        },
+        "build": {
+          "type": ["string", "null"]
+        },
+        "coverage": {
+          "type": ["string", "null"]
+        },
+        "iac-validate": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "autoGateOnStop": {
+          "type": "boolean",
+          "default": false
+        },
+        "autoGateOnEdit": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "conventions": {
+      "type": "object",
+      "description": "Free-form notes specialists must respect (validation libs, state mgmt, naming, error handling).",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "delivery": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Delivery team settings (sdlckit-team plugin, docs/team.md). Written by /eng-init's delivery step.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "dir": {
+          "type": "string",
+          "default": ".delivery"
+        },
+        "budget": {
+          "type": "string",
+          "enum": ["lean", "balanced", "max"],
+          "default": "balanced"
+        },
+        "maxParallelEngineers": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6,
+          "default": 2
+        },
+        "qaReworkCap": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6,
+          "default": 3
+        },
+        "refinementRounds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3,
+          "default": 2
+        },
+        "baseBranch": {
+          "type": "string",
+          "default": "main"
+        },
+        "gates": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Gate names (keys of .gates) run per ticket by `sdlckit-delivery gates`.",
+          "default": ["format", "lint", "typecheck", "test"]
+        },
+        "worktreeSetup": {
+          "type": ["string", "null"],
+          "description": "Command run in each new worktree, e.g. 'pnpm install --frozen-lockfile'."
+        },
+        "worktreeCopy": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Untracked local files copied into worktrees (e.g. .env files). Never committed."
+        },
+        "designSystem": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "web": {
+              "type": "string",
+              "default": "shadcn"
+            },
+            "mobile": {
+              "type": "string",
+              "default": "react-native-reusables"
+            }
+          }
+        },
+        "engineers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "-engineer$"
+          },
+          "description": "Domain \u2192 engineer agent overrides for stacks routing.json doesn't map (e.g. {\"express-api\": \"backend-engineer\"})."
+        }
+      }
+    }
+  }
+}
