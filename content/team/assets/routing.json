@@ -1,48 +1,21 @@
 {
-  "version": 1,
-  "description": "Model and escalation policy for sdlckit-team. Read by `sdlckit-delivery model`; explained in routing.md.",
-  "tiers": ["haiku", "sonnet", "opus"],
-  "profiles": {
-    "lean": {
-      "tech-lead": "sonnet",
-      "qa-specialist": "sonnet",
-      "solution-architect": "sonnet",
-      "staff-engineer": "sonnet",
-      "product-owner": "sonnet",
-      "ui-ux-designer": "sonnet",
-      "engineer": "sonnet",
-      "engineer@small": "haiku",
-      "technical-writer": "haiku",
-      "delivery-manager": "haiku",
-      "business-analyst": "haiku",
-      "devops-engineer": "sonnet"
-    },
-    "balanced": {
-      "tech-lead": "opus",
-      "qa-specialist": "opus",
-      "solution-architect": "sonnet",
-      "staff-engineer": "sonnet",
-      "product-owner": "sonnet",
-      "ui-ux-designer": "sonnet",
-      "engineer": "sonnet",
-      "technical-writer": "sonnet",
-      "delivery-manager": "sonnet",
-      "business-analyst": "sonnet",
-      "devops-engineer": "sonnet"
-    },
-    "max": {
-      "tech-lead": "opus",
-      "qa-specialist": "opus",
-      "solution-architect": "opus",
-      "staff-engineer": "opus",
-      "product-owner": "opus",
-      "ui-ux-designer": "opus",
-      "engineer": "sonnet",
-      "technical-writer": "sonnet",
-      "delivery-manager": "sonnet",
-      "business-analyst": "sonnet",
-      "devops-engineer": "sonnet"
-    }
+  "version": 2,
+  "description": "Model and effort policy for sdlckit-team. Every role runs on haiku; effort varies per role and rises on rework. Read by `sdlckit-delivery model`; explained in routing.md.",
+  "model": "haiku",
+  "effortLevels": ["low", "medium", "high", "xhigh", "max"],
+  "effort": {
+    "tech-lead": "xhigh",
+    "qa-specialist": "xhigh",
+    "solution-architect": "high",
+    "staff-engineer": "high",
+    "product-owner": "high",
+    "ui-ux-designer": "medium",
+    "engineer": "medium",
+    "engineer@small": "low",
+    "technical-writer": "low",
+    "delivery-manager": "low",
+    "business-analyst": "medium",
+    "devops-engineer": "medium"
   },
   "engineers": {
     "react-web": "frontend-engineer",
@@ -59,6 +32,8 @@
   "escalation": {
     "engineerQaRound": 2,
     "engineerRedGateRuns": 2,
-    "architectOnEpicRisk": "high"
+    "engineerEffort": "high",
+    "architectOnEpicRisk": "high",
+    "architectEffortOnEpicRisk": "xhigh"
   }
 }

@@ -6,7 +6,8 @@ version: 0.1.0
 status: current
 verified: 2026-10-18
 claudeCodeVersion: 2.1.302
-model: sonnet
+model: "haiku"
+effort: low
 tools: Bash, Read, Write, Edit, Glob, Grep
 ---
 You are the **Delivery Manager agent**. You tell the PO (the user) the truth about delivery, in
@@ -32,7 +33,7 @@ Fill the report template:
   acceptance-prep gaps here.
 - **Release notes** — leave for devops-engineer if it ran; else "No release steps (no migrations,
   env, CI or deploy config changed)." only if that is true per the diff.
-- **Stats** — from `D stats`: tickets, QA rounds, rework tickets, escalations (role → model), profile.
+- **Stats** — from `D stats`: tickets, QA rounds, rework tickets, escalations (role → effort), model.
 
 ## Mode `status`
 From `D board` and `D next` for each epic: one line per epic (state, n/m done, what's moving),

@@ -1,8 +1,9 @@
 ---
 name: "performance-reviewer"
 description: "Performance reviewer for changes touching DB access, high-volume APIs, async work, large payloads, concurrency or rendering: latency, throughput, memory, caching, backpressure, N+1."
-model: "sonnet"
+model: "haiku"
 tools: "Bash, Read, Glob, Grep"
+effort: "medium"
 skills: ["sdlckit-workflow:eng-performance","sdlckit-workflow:findings-contract"]
 ---
 You are the **performance reviewer**. First load the `eng-performance` rulebook (preloaded)

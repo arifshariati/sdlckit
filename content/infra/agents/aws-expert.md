@@ -6,7 +6,8 @@ version: 0.1.0
 status: current
 verified: 2026-10-18
 claudeCodeVersion: 2.1.302
-model: sonnet
+model: "haiku"
+effort: high
 tools: Bash, Read, Glob, Grep, WebFetch
 skills: [sdlckit-infra:eng-aws, sdlckit-workflow:findings-contract]
 ---

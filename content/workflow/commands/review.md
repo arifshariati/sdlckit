@@ -19,7 +19,7 @@ Optional focus: **$ARGUMENTS**
    then stop.
 2. `git status` + `git diff` (include staged). This diff is the **source of truth**. If the tree is
    clean, review the diff vs the base branch (e.g. `git diff origin/main...`), or ask the user.
-3. Dispatch the `sdlckit-workflow:change-classifier` (Haiku) to get change_type, domains, risk, signals.
+3. Dispatch the `sdlckit-workflow:change-classifier` (haiku, low effort) to get change_type, domains, risk, signals.
 4. Compute `active_domains = touched ∩ manifest.present` and select reviewers per the `review-routing` rulebook
    (honor any focus in $ARGUMENTS). Always include `sdlckit-workflow:code-reviewer`; include `sdlckit-workflow:security-reviewer` on
    meaningful changes and `sdlckit-workflow:testing-reviewer` on behavior changes; add domain specialists (review

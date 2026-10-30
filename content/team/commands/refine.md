@@ -18,7 +18,7 @@ Input: **$ARGUMENTS** (first token = epic id; the rest = optional revision notes
 
 You coordinate; agents do the thinking. Give each agent only: epic id, epic worktree path, the
 files it must read, its mode, and (for revise) the consolidated items. Before every dispatch run
-`D model <role> <E-###>` and pass the returned `model` to the Agent tool.
+`D model <role> <E-###>` and pass the returned `model` and `effort` to the Agent tool.
 
 ## Validating every agent reply (applies to every dispatch below)
 After each agent returns, write its final reply to a temp file in the scratchpad and run
@@ -78,8 +78,8 @@ Present, compactly:
 4. **Decisions for you** — each with both positions and the recommendation. Ask each one
    separately with AskUserQuestion (recommended first) and record the answer in the epic
    (tech-lead patches tickets via SendMessage if an answer changes them).
-5. **Cost preview:** count of ui tickets (designer runs), tickets per risk tier, and the budget
-   profile in effect.
+5. **Cost preview:** count of ui tickets (designer runs), tickets per risk tier, and the effort
+   level in effect.
 Then ask: **Approve plan** / **Revise** (take notes → step 4 with the notes, max one extra round
 before asking again) / **Re-architect** (→ step 1).
 **Only on explicit approval:** for each ADR run `D set ADR-### status=accepted` and update its `- Status:` line, then

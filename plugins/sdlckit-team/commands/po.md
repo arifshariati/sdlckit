@@ -44,7 +44,7 @@ open assumptions, and the user's own words for each WHY where they gave them.
 
 ## 4. Draft (delegate — cheaper than drafting in the main thread)
 - For each confirmed epic: `D new epic --title "<title>"` → collect ids.
-- Resolve the model: `D model product-owner` → pass its `model` to the Agent tool.
+- Resolve the model and effort: `D model product-owner` → pass its `model` and `effort` to the Agent tool.
 - Dispatch `sdlckit-team:product-owner` in mode **draft** with: the brief path, the epic ids, and the
   instruction to set priority/risk/depends_on. Batch ≤5 epics per dispatch; independent batches
   run in parallel.

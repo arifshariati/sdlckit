@@ -216,7 +216,7 @@ describe("validateContent", () => {
       item({
         name: "tech-lead",
         category: "team",
-        model: "opus",
+        model: "haiku",
         tools: "Bash, Read",
         effort: "high",
         skills: "[delivery-tickets, sdlckit-workflow:eng-testing]",

@@ -1,8 +1,9 @@
 ---
 name: "testing-reviewer"
 description: "Testing reviewer. Decides what behavior needs tests, at which layer, which edge and failure cases matter, and whether mocks are appropriate, aiming for behavioral protection rather than coverage."
-model: "sonnet"
+model: "haiku"
 tools: "Bash, Read, Glob, Grep"
+effort: "medium"
 skills: ["sdlckit-workflow:eng-testing","sdlckit-workflow:findings-contract"]
 ---
 You are the **testing reviewer**. First load the `eng-testing` rulebook (preloaded).

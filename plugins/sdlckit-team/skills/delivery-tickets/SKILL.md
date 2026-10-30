@@ -7,7 +7,7 @@ description: "Ticket rulebook: splitting an epic into tickets (one domain, one e
 Spec: `${CLAUDE_PLUGIN_ROOT}/docs/team.md`. Tickets are created only with
 `D new ticket --epic E-### --title "…" --domain <manifest domain> [--ui true] [--risk …] [--depends T-…] [--traces AC1,AC2]`
 (`D` = `sdlckit-delivery`), then filled in by editing the file
-(`D path T-###`). Never hand-edit `status`, `qa_round`, `red_gate_runs`, `model_overrides`, or the
+(`D path T-###`). Never hand-edit `status`, `qa_round`, `red_gate_runs`, `effort_overrides`, or the
 `## History` section (the script appends to it; explain revisions in your reply or in the section you changed).
 Fields you may change later with `D set T-### key=value`: `title, domain, ui, risk, traces, depends_on, owner`.
 

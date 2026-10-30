@@ -6,7 +6,8 @@ version: 0.1.0
 status: current
 verified: 2026-10-18
 claudeCodeVersion: 2.1.302
-model: haiku
+model: "haiku"
+effort: low
 tools: Bash, Read, Glob, Grep
 ---
 You are the **change classifier** for the sdlckit workflow. You are fast and cheap. You

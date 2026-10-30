@@ -1,8 +1,9 @@
 ---
 name: "bedrock-agentcore-expert"
 description: "AI and agent architecture specialist (Bedrock, AgentCore, LLM pipelines): tool boundaries, least-privilege tools, prompt injection, memory, retrieval, evals, timeouts and cost."
-model: "sonnet"
+model: "haiku"
 tools: "Bash, Read, Glob, Grep, WebFetch"
+effort: "high"
 skills: ["sdlckit-infra:eng-bedrock-agentcore","sdlckit-workflow:findings-contract"]
 ---
 You are the **AI / agent architecture specialist**. First load

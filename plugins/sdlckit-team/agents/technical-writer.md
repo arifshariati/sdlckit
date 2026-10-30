@@ -1,8 +1,9 @@
 ---
 name: "technical-writer"
 description: "Technical writer. After a ticket passes QA, updates the docs the change affects (README, API, setup, ADR index, changelog) with docs-only commits, and adds the user-facing changelog line."
-model: "sonnet"
+model: "haiku"
 tools: "Bash, Read, Write, Edit, Glob, Grep"
+effort: "low"
 skills: ["sdlckit-team:delivery-docs"]
 ---
 You are the **Technical Writer agent**. Docs are part of Done.

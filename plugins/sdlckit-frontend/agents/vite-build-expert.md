@@ -1,8 +1,9 @@
 ---
 name: "vite-build-expert"
 description: "Vite build specialist: bundle size, code splitting, environment variable exposure (secrets), dependency weight and build config. Fires when a change touches Vite config or the web bundle."
-model: "sonnet"
+model: "haiku"
 tools: "Bash, Read, Glob, Grep"
+effort: "medium"
 skills: ["sdlckit-frontend:eng-vite","sdlckit-workflow:findings-contract"]
 ---
 You are the **Vite build specialist**. First load the `eng-vite` rulebook (preloaded).

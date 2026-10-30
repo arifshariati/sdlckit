@@ -45,7 +45,7 @@ manifest schema: `${CLAUDE_PLUGIN_ROOT}/docs/manifest.schema.json`) for the curr
 7. **Delivery team step (only if the `sdlckit-team` plugin is installed, i.e. `sdlckit-delivery` is on PATH).** Ask once: "Enable the delivery team (PO → refine → design → build →
    QA → done) in this repo?" (recommended: yes). If yes:
    - Resolve `delivery` settings (schema: manifest `delivery` section; spec:
-     the team plugin's `docs/team.md`): `budget` (default `balanced`), `maxParallelEngineers` (2),
+     the team plugin's `docs/team.md`): `maxParallelEngineers` (2),
      `baseBranch` (the repo's real default branch: `git symbolic-ref refs/remotes/origin/HEAD` or
      `main`), `gates` (the per-ticket gate list — only gates that are non-null above; prefer
      `test-affected` over `test` in large monorepos), `worktreeSetup` (the install command, e.g.

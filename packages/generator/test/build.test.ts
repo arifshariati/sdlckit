@@ -168,7 +168,7 @@ describe("buildPlugins", () => {
       "content/workflow/agents/reviewer.md",
       item("reviewer", "workflow").replace(
         "claudeCodeVersion: 2.1.0",
-        "claudeCodeVersion: 2.1.0\nskills: [eng-testing]\ntools: Bash, Read\nmodel: opus",
+        "claudeCodeVersion: 2.1.0\nskills: [eng-testing]\ntools: Bash, Read\nmodel: haiku",
       ),
     );
     const files = await buildPlugins(root);
@@ -178,7 +178,7 @@ describe("buildPlugins", () => {
         "---",
         'name: "reviewer"',
         'description: "Plan the change before editing any file"',
-        'model: "opus"',
+        'model: "haiku"',
         'tools: "Bash, Read"',
         'skills: ["eng-testing"]',
         "---",

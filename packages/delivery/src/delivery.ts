@@ -34,7 +34,6 @@ export type Opts = Record<string, string | true>;
 
 interface Config {
   dir: string;
-  budget: string;
   maxParallelEngineers: number;
   qaReworkCap: number;
   baseBranch: string;
@@ -46,13 +45,16 @@ interface Config {
 }
 
 interface Routing {
-  tiers: string[];
-  profiles: Record<string, Record<string, string>>;
+  model: string;
+  effortLevels: string[];
+  effort: Record<string, string>;
   engineers: Record<string, string>;
   escalation: {
     engineerQaRound: number;
     engineerRedGateRuns: number;
+    engineerEffort: string;
     architectOnEpicRisk: string;
+    architectEffortOnEpicRisk: string;
   };
 }
 
@@ -98,6 +100,7 @@ const LOCKED_FIELDS = [
   "qa_round",
   "red_gate_runs",
   "blocked_from",
+  "effort_overrides",
   "model_overrides",
   "epic",
 ];
@@ -164,7 +167,6 @@ export class Delivery {
     const d = (this.manifest().delivery ?? {}) as Partial<Config>;
     this.configCache = {
       dir: d.dir ?? ".delivery",
-      budget: d.budget ?? "balanced",
       maxParallelEngineers: d.maxParallelEngineers ?? 2,
       qaReworkCap: d.qaReworkCap ?? 3,
       baseBranch: d.baseBranch ?? "main",
@@ -1047,12 +1049,10 @@ export class Delivery {
     );
   }
 
-  // ───────────── model routing ─────────────
+  // ───────────── model and effort routing ─────────────
+  // Every role runs on routing.model (haiku). Only effort varies, and it only rises on rework.
   model(role: string, id?: string): void {
     const routing = this.routing();
-    const budget = this.config().budget;
-    const profile = routing.profiles[budget];
-    if (!profile) throw new DeliveryError(`unknown budget profile ${budget}`);
     const shortRole = role.includes(":")
       ? (role.split(":").pop() ?? role)
       : role;
@@ -1062,22 +1062,29 @@ export class Delivery {
     const rec = id ? this.findRec(id) : null;
     const reasons: string[] = [];
     let key = isEngineer ? "engineer" : shortRole;
-    if (isEngineer && rec?.fm.risk === "small" && profile["engineer@small"])
+    if (
+      isEngineer &&
+      rec?.fm.risk === "small" &&
+      routing.effort["engineer@small"]
+    )
       key = "engineer@small";
-    let tier = profile[key];
-    if (!tier) throw new DeliveryError(`role ${role} not in routing profile`);
-    const up = (from: string) =>
-      routing.tiers[
-        Math.min(routing.tiers.indexOf(from) + 1, routing.tiers.length - 1)
-      ] ?? from;
+    const roleEffort = routing.effort[key];
+    if (!roleEffort)
+      throw new DeliveryError(`role ${role} not in routing.effort`);
+    let effort: string = roleEffort;
+    const raise = (target: string): string =>
+      routing.effortLevels.indexOf(target) >
+      routing.effortLevels.indexOf(effort)
+        ? target
+        : effort;
     if (isEngineer && rec) {
       if (num(rec.fm.qa_round) >= routing.escalation.engineerQaRound) {
-        tier = up(tier);
+        effort = raise(routing.escalation.engineerEffort);
         reasons.push(`qa_round ${num(rec.fm.qa_round)}`);
       } else if (
         num(rec.fm.red_gate_runs) >= routing.escalation.engineerRedGateRuns
       ) {
-        tier = up(tier);
+        effort = raise(routing.escalation.engineerEffort);
         reasons.push(`${num(rec.fm.red_gate_runs)} red gate runs`);
       }
     }
@@ -1086,22 +1093,22 @@ export class Delivery {
         ? rec
         : this.findRec(str(rec.fm.epic));
       if (epic.fm.risk === routing.escalation.architectOnEpicRisk) {
-        tier = "opus";
+        effort = raise(routing.escalation.architectEffortOnEpicRisk);
         reasons.push("epic risk high");
       }
     }
     if (reasons.length && rec && str(rec.fm.id).startsWith("T-")) {
-      rec.fm.model_overrides = {
-        ...map(rec.fm.model_overrides),
-        [shortRole]: tier,
+      rec.fm.effort_overrides = {
+        ...map(rec.fm.effort_overrides),
+        [shortRole]: effort,
       };
       writeRec(rec);
     }
     this.out(
       JSON.stringify({
         role: shortRole,
-        profile: budget,
-        model: tier,
+        model: routing.model,
+        effort,
         escalated: reasons.length > 0,
         reasons,
       }),
@@ -1178,7 +1185,6 @@ export class Delivery {
       status: str(e.fm.status),
       risk: str(e.fm.risk),
       gates,
-      profile: this.config().budget,
       tickets: tickets.length,
       byStatus: tickets.reduce<Record<string, number>>((acc, t) => {
         acc[str(t.fm.status)] = (acc[str(t.fm.status)] ?? 0) + 1;
@@ -1189,8 +1195,8 @@ export class Delivery {
         .filter((t) => num(t.fm.qa_round) > 1)
         .map((t) => `${str(t.fm.id)} (${num(t.fm.qa_round)} rounds)`),
       escalations: tickets.flatMap((t) =>
-        Object.entries(map(t.fm.model_overrides)).map(
-          ([role, m]) => `${str(t.fm.id)}: ${role} → ${str(m)}`,
+        Object.entries(map(t.fm.effort_overrides)).map(
+          ([role, e]) => `${str(t.fm.id)}: ${role} → effort ${str(e)}`,
         ),
       ),
       cancelled: tickets

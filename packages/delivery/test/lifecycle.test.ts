@@ -252,9 +252,14 @@ describe("ticket and epic lifecycle", () => {
     ok(root, "gates", "T-001");
     ok(root, "review", "T-001", "--blockers", "0", "--majors", "0");
     ok(root, "transition", "T-001", "in-qa");
-    expect(
-      ok(root, "model", "sdlckit-team:backend-engineer", "T-001"),
-    ).toContain('"model":"opus"');
+    const escalated = ok(
+      root,
+      "model",
+      "sdlckit-team:backend-engineer",
+      "T-001",
+    );
+    expect(escalated).toContain('"model":"haiku"');
+    expect(escalated).toContain('"effort":"high"');
 
     report = ok(root, "qa-round", "T-001").trim();
     edit(report, "TAC1: TBD", "TAC1: PASS");
