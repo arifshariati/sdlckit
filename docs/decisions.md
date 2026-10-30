@@ -36,6 +36,8 @@ Decision log from the design interview. Each entry is final unless revisited her
 
 30. **Launch (revisits 14):** the repository went public on 2026-10-18 and was tagged v0.1.0 the same day. Entry 14's private-first plan is superseded. Launch posts follow the same order as before. Community files are in place: CONTRIBUTING.md (DCO sign-off), CODE_OF_CONDUCT.md (Contributor Covenant 2.1), SECURITY.md with private vulnerability reporting enabled, CODEOWNERS, and issue and PR templates.
 
+31. **Haiku everywhere, effort per role (amends 14 and 24):** every agent in every pack runs on `haiku`. Model tiers and per-repo budget profiles are removed. Depth comes from each agent's `effort` (`low` to `xhigh`), set in its frontmatter and in `routing.json`. The highest effort goes to decomposition and the done-verdict (tech-lead, QA at `xhigh`), then architecture (`xhigh`), then design judgment and review (`high`). Specialists and engineers use `medium`, and summarising roles use `low`. Escalation on rework raises effort and never changes the model. Each raise is recorded in the ticket's `effort_overrides`.
+
 ## Open topics
 
 None. The design interview is complete. Remaining work is implementation, starting with the validators.

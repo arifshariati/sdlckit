@@ -148,11 +148,6 @@
           "type": "string",
           "default": ".delivery"
         },
-        "budget": {
-          "type": "string",
-          "enum": ["lean", "balanced", "max"],
-          "default": "balanced"
-        },
         "maxParallelEngineers": {
           "type": "integer",
           "minimum": 1,

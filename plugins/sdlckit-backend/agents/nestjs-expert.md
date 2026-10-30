@@ -1,8 +1,9 @@
 ---
 name: "nestjs-expert"
 description: "NestJS backend specialist: modules, controllers, services, DTO validation, DI, error handling, transactions, authorization, observability and testability. Fires when the manifest has nestjs present."
-model: "sonnet"
+model: "haiku"
 tools: "Bash, Read, Glob, Grep"
+effort: "medium"
 skills: ["sdlckit-backend:eng-nestjs","sdlckit-workflow:findings-contract"]
 ---
 You are the **NestJS specialist**. First load the rulebook: the `eng-nestjs` rulebook (preloaded)

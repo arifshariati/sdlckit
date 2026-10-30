@@ -47,23 +47,25 @@ change goes to `/sdlckit-workflow:implement`, "where are we?" goes to `/sdlckit-
 
 ## 3. The team
 
-| Role | Does | Model (balanced) |
+Every role runs on **haiku**. The effort level (how hard it thinks) is set per role.
+
+| Role | Does | Effort |
 |---|---|---|
-| product-owner | your proxy: drafts epics, checks breakdowns and designs against your intent, honest acceptance gaps | Sonnet |
-| business-analyst | success metrics + instrumentation (only when you want measurement) | Sonnet |
-| solution-architect | epic design: data model, exact contracts, NFRs, ADRs | Sonnet (Opus for high-risk epics) |
-| tech-lead | tickets, acceptance criteria, sequencing, design buildability, escalations | **Opus** |
-| staff-engineer | independent challenger: hidden work, risk, sizing, simpler alternatives | Sonnet |
-| ui-ux-designer | spec-only `design.md` with exact shadcn components, every state, final copy | Sonnet |
-| frontend / mobile / backend / data / infra / ai engineer | build one ticket in its own git worktree, run the gates | Sonnet (Opus after 2 QA rounds) |
-| qa-specialist | test plan before code, locked acceptance tests, evidence per criterion | **Opus** |
-| technical-writer | docs + changelog per ticket | Sonnet |
-| devops-engineer | release notes: deploy/migration order, env vars, rollback (only when needed) | Sonnet |
-| delivery-manager | the epic report and status narratives | Sonnet |
+| product-owner | your proxy: drafts epics, checks breakdowns and designs against your intent, honest acceptance gaps | high |
+| business-analyst | success metrics + instrumentation (only when you want measurement) | medium |
+| solution-architect | epic design: data model, exact contracts, NFRs, ADRs | high (xhigh for high-risk epics) |
+| tech-lead | tickets, acceptance criteria, sequencing, design buildability, escalations | **xhigh** |
+| staff-engineer | independent challenger: hidden work, risk, sizing, simpler alternatives | high |
+| ui-ux-designer | spec-only `design.md` with exact shadcn components, every state, final copy | medium |
+| frontend / mobile / backend / data / infra / ai engineer | build one ticket in its own git worktree, run the gates | medium (high after 2 QA rounds) |
+| qa-specialist | test plan before code, locked acceptance tests, evidence per criterion | **xhigh** |
+| technical-writer | docs + changelog per ticket | low |
+| devops-engineer | release notes: deploy/migration order, env vars, rollback (only when needed) | medium |
+| delivery-manager | the epic report and status narratives | low |
 
 Your existing engineering reviewers (code, security, testing, performance, domain experts) review
-every build, chosen by risk and by what the diff touches. Change the budget per repo with
-`delivery.budget`: `lean`, `balanced` (default) or `max` — see `routing.md` in this folder.
+every build, chosen by risk and by what the diff touches. They also run on haiku, with their own
+effort levels — see `routing.md` in this folder.
 
 ## 4. What lives where
 

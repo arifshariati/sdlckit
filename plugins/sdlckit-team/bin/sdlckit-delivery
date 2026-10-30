@@ -269,6 +269,7 @@ var LOCKED_FIELDS = [
   "qa_round",
   "red_gate_runs",
   "blocked_from",
+  "effort_overrides",
   "model_overrides",
   "epic"
 ];
@@ -325,7 +326,6 @@ var Delivery = class {
     const d = this.manifest().delivery ?? {};
     this.configCache = {
       dir: d.dir ?? ".delivery",
-      budget: d.budget ?? "balanced",
       maxParallelEngineers: d.maxParallelEngineers ?? 2,
       qaReworkCap: d.qaReworkCap ?? 3,
       baseBranch: d.baseBranch ?? "main",
@@ -1127,50 +1127,50 @@ ${r.stdout}${r.stderr}`,
       `removed worktrees for ${eid}; branches kept (delete them with git branch -d when you like)`
     );
   }
-  // ───────────── model routing ─────────────
+  // ───────────── model and effort routing ─────────────
+  // Every role runs on routing.model (haiku). Only effort varies, and it only rises on rework.
   model(role, id) {
     const routing = this.routing();
-    const budget = this.config().budget;
-    const profile = routing.profiles[budget];
-    if (!profile) throw new DeliveryError(`unknown budget profile ${budget}`);
     const shortRole = role.includes(":") ? role.split(":").pop() ?? role : role;
     const isEngineer = shortRole.endsWith("-engineer") && !["staff-engineer", "devops-engineer"].includes(shortRole);
     const rec = id ? this.findRec(id) : null;
     const reasons = [];
     let key = isEngineer ? "engineer" : shortRole;
-    if (isEngineer && rec?.fm.risk === "small" && profile["engineer@small"])
+    if (isEngineer && rec?.fm.risk === "small" && routing.effort["engineer@small"])
       key = "engineer@small";
-    let tier = profile[key];
-    if (!tier) throw new DeliveryError(`role ${role} not in routing profile`);
-    const up = (from) => routing.tiers[Math.min(routing.tiers.indexOf(from) + 1, routing.tiers.length - 1)] ?? from;
+    const roleEffort = routing.effort[key];
+    if (!roleEffort)
+      throw new DeliveryError(`role ${role} not in routing.effort`);
+    let effort = roleEffort;
+    const raise = (target) => routing.effortLevels.indexOf(target) > routing.effortLevels.indexOf(effort) ? target : effort;
     if (isEngineer && rec) {
       if (num(rec.fm.qa_round) >= routing.escalation.engineerQaRound) {
-        tier = up(tier);
+        effort = raise(routing.escalation.engineerEffort);
         reasons.push(`qa_round ${num(rec.fm.qa_round)}`);
       } else if (num(rec.fm.red_gate_runs) >= routing.escalation.engineerRedGateRuns) {
-        tier = up(tier);
+        effort = raise(routing.escalation.engineerEffort);
         reasons.push(`${num(rec.fm.red_gate_runs)} red gate runs`);
       }
     }
     if (shortRole === "solution-architect" && rec) {
       const epic = str(rec.fm.id).startsWith("E-") ? rec : this.findRec(str(rec.fm.epic));
       if (epic.fm.risk === routing.escalation.architectOnEpicRisk) {
-        tier = "opus";
+        effort = raise(routing.escalation.architectEffortOnEpicRisk);
         reasons.push("epic risk high");
       }
     }
     if (reasons.length && rec && str(rec.fm.id).startsWith("T-")) {
-      rec.fm.model_overrides = {
-        ...map(rec.fm.model_overrides),
-        [shortRole]: tier
+      rec.fm.effort_overrides = {
+        ...map(rec.fm.effort_overrides),
+        [shortRole]: effort
       };
       writeRec(rec);
     }
     this.out(
       JSON.stringify({
         role: shortRole,
-        profile: budget,
-        model: tier,
+        model: routing.model,
+        effort,
         escalated: reasons.length > 0,
         reasons
       })
@@ -1235,7 +1235,6 @@ ${r.stdout}${r.stderr}`,
       status: str(e.fm.status),
       risk: str(e.fm.risk),
       gates,
-      profile: this.config().budget,
       tickets: tickets.length,
       byStatus: tickets.reduce((acc, t) => {
         acc[str(t.fm.status)] = (acc[str(t.fm.status)] ?? 0) + 1;
@@ -1244,8 +1243,8 @@ ${r.stdout}${r.stderr}`,
       qaRounds: tickets.reduce((acc, t) => acc + num(t.fm.qa_round), 0),
       reworkTickets: tickets.filter((t) => num(t.fm.qa_round) > 1).map((t) => `${str(t.fm.id)} (${num(t.fm.qa_round)} rounds)`),
       escalations: tickets.flatMap(
-        (t) => Object.entries(map(t.fm.model_overrides)).map(
-          ([role, m]) => `${str(t.fm.id)}: ${role} \u2192 ${str(m)}`
+        (t) => Object.entries(map(t.fm.effort_overrides)).map(
+          ([role, e2]) => `${str(t.fm.id)}: ${role} \u2192 effort ${str(e2)}`
         )
       ),
       cancelled: tickets.filter((t) => t.fm.status === "cancelled").map((t) => str(t.fm.id)),
@@ -1682,7 +1681,7 @@ var USAGE = `sdlckit-delivery <command>
   changelog <T> <text>                   add or replace the ticket's line in the epic Changelog
   merge <T>                              merge a qa-passed ticket into the epic branch
   cleanup <E>                            remove worktrees after the epic PR is merged
-  model <role> [id]                      resolve the model tier (budget profile and escalation)
+  model <role> [id]                      resolve the model (haiku) and effort (role default and escalation)
   next <E>                               scheduling view (JSON)
   stats <E>                              epic stats for reports (JSON)
   status-md [--in E]                     render docs.statusFile's table and pie from records

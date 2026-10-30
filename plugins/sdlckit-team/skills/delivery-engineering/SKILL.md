@@ -50,7 +50,7 @@ and never hand-edit the table or pie in `delivery.docs.statusFile` (the script r
 ## Gates (you run them; the orchestrator trusts only the log)
 `D gates T-###` runs the manifest gates in your worktree and records PASS/FAIL against your HEAD.
 Iterate until `gates: PASS`. Never claim a gate passed without that output. After 2 consecutive
-red runs you may be escalated to a stronger model — say clearly what is failing and why.
+red runs you may be escalated to a higher effort level — say clearly what is failing and why.
 
 ## Engineering notes (in the ticket file, epic worktree)
 What you built (files), decisions within the approach, deviations (with reason), things found in

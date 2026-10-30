@@ -11,7 +11,7 @@ depends_on: []
 owner: {{owner}}
 qa_round: 0
 red_gate_runs: 0
-model_overrides: {}
+effort_overrides: {}
 created: {{date}}
 ---
 # {{id}} · {{title}}

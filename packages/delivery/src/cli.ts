@@ -24,7 +24,7 @@ const USAGE = `sdlckit-delivery <command>
   changelog <T> <text>                   add or replace the ticket's line in the epic Changelog
   merge <T>                              merge a qa-passed ticket into the epic branch
   cleanup <E>                            remove worktrees after the epic PR is merged
-  model <role> [id]                      resolve the model tier (budget profile and escalation)
+  model <role> [id]                      resolve the model (haiku) and effort (role default and escalation)
   next <E>                               scheduling view (JSON)
   stats <E>                              epic stats for reports (JSON)
   status-md [--in E]                     render docs.statusFile's table and pie from records

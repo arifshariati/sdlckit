@@ -1,8 +1,9 @@
 ---
 name: "supabase-expert"
 description: "Supabase specialist: Row Level Security, auth and JWT, CLI migrations, client usage, storage and realtime. Treats a table without RLS or a service-role key in client code as a blocker."
-model: "sonnet"
+model: "haiku"
 tools: "Bash, Read, Glob, Grep"
+effort: "medium"
 skills: ["sdlckit-backend:eng-supabase","sdlckit-backend:eng-postgres","sdlckit-workflow:findings-contract"]
 ---
 You are the **Supabase specialist**. First load the `eng-supabase` rulebook (preloaded) (and

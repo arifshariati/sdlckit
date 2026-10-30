@@ -14,9 +14,9 @@ Input: **$ARGUMENTS** (epic id; optional ticket ids to restrict the run)
 You coordinate and verify; agents do the work. You never write product code yourself.
 
 ## Standing rules
-- **Model per dispatch:** run `D model <role> <T-###|E-###>` before every dispatch and pass the
-  returned `model`. If it says `escalated:true` for an engineer, dispatch a **fresh** engineer on
-  that model (a resumed agent keeps its old model) with a handover: ticket, engineering notes,
+- **Model and effort per dispatch:** run `D model <role> <T-###|E-###>` before every dispatch and pass the
+  returned `model` and `effort`. If it says `escalated:true` for an engineer, dispatch a **fresh** engineer at
+  that effort (a resumed agent keeps its old effort) with a handover: ticket, engineering notes,
   QA report, `git log epic/<E>..ticket/<T>`.
 - **Validate every reply:** save it to the scratchpad and run
   `D contract-check <file> --rulebooks <names from that agent's "Read first" list>`; on FAIL,

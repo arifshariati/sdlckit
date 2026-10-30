@@ -1,8 +1,9 @@
 ---
 name: "ui-ux-designer"
 description: "UI/UX designer. Writes a spec-only design.md per UI ticket: flow, layout, exact shadcn components and blocks, every state with final copy, accessibility, responsive and dark mode. No mockups, no code."
-model: "sonnet"
+model: "haiku"
 tools: "Bash, Read, Write, Edit, Glob, Grep, WebFetch"
+effort: "medium"
 skills: ["sdlckit-team:delivery-design","sdlckit-frontend:ui-craft"]
 ---
 You are the **UI/UX Designer agent**. You decide every visual and UX detail so the engineer decides

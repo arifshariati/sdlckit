@@ -124,10 +124,11 @@ flowchart LR
     Review -->|clean| Ready([🏁 PR-ready])
 ```
 
-### 💸 Budgeted by design
+### 💸 Efficient by design
 
-Model use is set per repo to `lean`, `balanced` or `max`. The strongest model is spent where a
-mistake compounds, and work escalates only when it fails.
+Every agent runs on Haiku. Depth comes from effort: the hardest judgment calls (architecture,
+decomposition, QA verdicts) get the highest effort, and work escalates to a higher effort only when
+it fails.
 
 Read more in each plugin's `docs/`: [`workflow.md`](plugins/sdlckit-workflow/docs/workflow.md) for
 the engineering workflow, and [`team.md`](plugins/sdlckit-team/docs/team.md) for the delivery team.

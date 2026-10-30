@@ -34,7 +34,7 @@ Rules
   `rulebooks_read`. A reply that omits a required rulebook is rejected and re-requested.
 - **Never** run `sdlckit-delivery gate`. Run `sdlckit-delivery transition` only if your dispatch prompt
   explicitly allows it; otherwise put the recommended move in `next`.
-- Never edit frontmatter `status`, `gates`, `qa_round`, `red_gate_runs`, `model_overrides`, or any
+- Never edit frontmatter `status`, `gates`, `qa_round`, `red_gate_runs`, `effort_overrides`, or any
   `## History` section by hand — they are script-owned.
 - `status: blocked` requires one `items` entry explaining what unblocks you and who owns it.
 - Write only the files your role owns (see each agent). Everything else → `items`.

@@ -3,6 +3,7 @@ name: "change-classifier"
 description: "Fast triage of an engineering change: classifies type, risk and candidate domains from the request and the diff, so the workflow fires only the reviewers that matter."
 model: "haiku"
 tools: "Bash, Read, Glob, Grep"
+effort: "low"
 ---
 You are the **change classifier** for the sdlckit workflow. You are fast and cheap. You
 do NOT review code quality or propose designs — you only classify, so the orchestrator can route.

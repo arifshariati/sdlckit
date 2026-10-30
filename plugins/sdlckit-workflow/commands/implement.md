@@ -19,7 +19,7 @@ Requirement: **$ARGUMENTS**
   (offer to run it), then stop.
 
 ## 1. Classify
-- Dispatch the `sdlckit-workflow:change-classifier` agent (Haiku) with the requirement + `git status`/`git diff`
+- Dispatch the `sdlckit-workflow:change-classifier` agent (haiku, low effort) with the requirement + `git status`/`git diff`
   context. Get: `change_type`, candidate domains, risk level, suggested workflow depth.
 
 ## 2. Compute routing
@@ -30,7 +30,7 @@ Requirement: **$ARGUMENTS**
   affected tests) and jump to §5.
 
 ## 3. Plan (normal / high-risk)
-- Dispatch in parallel: `sdlckit-workflow:architect` (Opus) + the selected domain specialists. Give each only the
+- Dispatch in parallel: `sdlckit-workflow:architect` (haiku, xhigh effort) + the selected domain specialists. Give each only the
   context it needs (manifest, relevant domain skill name, the relevant files/diff) — progressive
   loading, not the whole repo.
 - Consolidate their structured outputs into ONE implementation plan answering: WHAT/WHERE/WHY/HOW,
@@ -52,7 +52,7 @@ Requirement: **$ARGUMENTS**
 ## 6. Review (normal / high-risk)
 - `git diff` is the source of truth. Dispatch the relevant reviewers in parallel: domain
   specialists in review mode + `sdlckit-workflow:security-reviewer` + `sdlckit-workflow:testing-reviewer` + `sdlckit-workflow:code-reviewer`
-  (Opus; add `sdlckit-workflow:performance-reviewer` on perf/DB/async signals). Each returns the YAML findings
+  (haiku, high effort; add `sdlckit-workflow:performance-reviewer` on perf/DB/async signals). Each returns the YAML findings
   contract.
 
 ## 7. Fix loop (max 2 iterations; 3 for high-risk)
@@ -61,7 +61,7 @@ Requirement: **$ARGUMENTS**
   surface anything unresolved rather than looping forever.
 
 ## 8. PR readiness
-- Dispatch `sdlckit-workflow:pr-readiness` (Opus) — or inline the Definition of Done if that agent isn't built yet
+- Dispatch `sdlckit-workflow:pr-readiness` (haiku, high effort) — or inline the Definition of Done if that agent isn't built yet
   — producing the DoD table (architecture/impl/format/lint/typecheck/tests/security/domain/
   code-review all PASS, blockers 0, majors 0) and READY / NOT READY with required actions.
 - If READY, draft the PR description following `${CLAUDE_PLUGIN_ROOT}/skills/pr-template/SKILL.md` (repo's own

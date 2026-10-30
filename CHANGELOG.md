@@ -3,6 +3,14 @@
 All notable changes to sdlckit are recorded here. The project follows [Semantic Versioning](https://semver.org/).
 While the major version is `0`, minor versions may include breaking changes.
 
+## [Unreleased]
+
+### Changed
+
+- **All packs:** every agent runs on `haiku`. Model tiers (`opus`, `sonnet`) and the per-repo `budget` setting (`lean`, `balanced`, `max`) are removed. Each agent sets an `effort` level instead (`low` to `xhigh`), chosen by how much judgment its role carries.
+- **sdlckit-team:** `sdlckit-delivery model` returns `model` and `effort`. Rework escalation raises effort (never the model), and escalations are recorded in `effort_overrides`. The ticket template uses `effort_overrides`.
+- **sdlckit-workflow:** `eng-init` no longer writes a `budget` setting, and the manifest schema drops `delivery.budget`.
+
 ## [0.1.0] - 2026-10-18
 
 First public release. sdlckit is pre-v1: expect changes before 1.0.
